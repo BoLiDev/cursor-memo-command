@@ -5,6 +5,168 @@ import { MemoTreeDataProvider, CategoryTreeItem } from "./memoTreeDataProvider";
 import { MemoDataService, MemoItem } from "./memoDataService";
 
 /**
+ * 创建多行输入界面
+ * @param title 输入框标题
+ * @param placeholder 占位符文本
+ * @param initialValue 初始值
+ * @returns Promise<string | undefined> 用户输入的内容或undefined（如果取消）
+ */
+async function createMultilineInputBox(
+  title: string,
+  placeholder: string,
+  initialValue: string = ""
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    // 创建WebviewPanel
+    const panel = vscode.window.createWebviewPanel(
+      "multilineInput",
+      title,
+      {
+        viewColumn: vscode.ViewColumn.Active,
+        preserveFocus: false,
+      },
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
+    );
+
+    // 设置初始尺寸
+    const initialWidth = 600;
+    const initialHeight = 400;
+    panel.webview.html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${title}</title>
+        <style>
+          body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+            font-family: var(--vscode-font-family);
+            overflow: hidden;
+          }
+          .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-height: 400px;
+            padding: 10px;
+            box-sizing: border-box;
+          }
+          textarea {
+            flex: 1;
+            resize: none;
+            padding: 8px;
+            min-height: 100px;
+            max-height: 300px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            font-family: var(--vscode-editor-font-family);
+            font-size: var(--vscode-editor-font-size);
+            line-height: 1.5;
+            margin-bottom: 10px;
+          }
+          .buttons {
+            margin-top: 5px;
+            text-align: right;
+            flex-shrink: 0;
+          }
+          button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+            margin-left: 8px;
+          }
+          button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+          .placeholder {
+            color: var(--vscode-input-placeholderForeground);
+            position: absolute;
+            pointer-events: none;
+            padding: 8px;
+            display: none;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="placeholder" id="placeholder">${placeholder}</div>
+          <textarea id="input" placeholder="${placeholder}" autofocus>${initialValue}</textarea>
+          <div class="buttons">
+            <button id="cancel">Cancel</button>
+            <button id="save">Save</button>
+          </div>
+        </div>
+        <script>
+          const vscode = acquireVsCodeApi();
+          const textarea = document.getElementById('input');
+
+          document.getElementById('save').addEventListener('click', () => {
+            vscode.postMessage({
+              type: 'save',
+              value: textarea.value
+            });
+          });
+
+          document.getElementById('cancel').addEventListener('click', () => {
+            vscode.postMessage({
+              type: 'cancel'
+            });
+          });
+
+          // 支持Ctrl+Enter或Cmd+Enter提交
+          textarea.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+              vscode.postMessage({
+                type: 'save',
+                value: textarea.value
+              });
+            }
+
+            if (e.key === 'Escape') {
+              vscode.postMessage({
+                type: 'cancel'
+              });
+            }
+          });
+
+          // 自动聚焦并将光标放到末尾
+          textarea.focus();
+          textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        </script>
+      </body>
+      </html>
+    `;
+
+    // 处理消息
+    panel.webview.onDidReceiveMessage((message) => {
+      if (message.type === "save") {
+        resolve(message.value);
+        panel.dispose();
+      } else if (message.type === "cancel") {
+        resolve(undefined);
+        panel.dispose();
+      }
+    });
+
+    // 处理面板关闭
+    panel.onDidDispose(() => {
+      resolve(undefined);
+    });
+  });
+}
+
+/**
  * Extension activation function
  * Called by VSCode when the extension is activated
  * Initializes data service, tree view, and various commands
@@ -36,11 +198,11 @@ export function activate(context: vscode.ExtensionContext) {
               // Ignore clipboard errors
             }
 
-            const commandText = await vscode.window.showInputBox({
-              placeHolder: "Enter command to save",
-              prompt: "Enter or paste the command content",
-              value: clipboardText,
-            });
+            const commandText = await createMultilineInputBox(
+              "Save Command",
+              "Enter or paste the command content",
+              clipboardText
+            );
 
             if (commandText) {
               await dataService.addCommand(commandText);
@@ -142,11 +304,11 @@ export function activate(context: vscode.ExtensionContext) {
           try {
             if (!item) return;
 
-            const editedCommand = await vscode.window.showInputBox({
-              placeHolder: "Edit command content",
-              prompt: "Modify the command content",
-              value: item.command,
-            });
+            const editedCommand = await createMultilineInputBox(
+              "Edit Command Content",
+              "Modify command content",
+              item.command
+            );
 
             if (editedCommand !== undefined && editedCommand !== item.command) {
               const success = await dataService.editCommand(
@@ -368,11 +530,11 @@ export function activate(context: vscode.ExtensionContext) {
               // Ignore clipboard errors
             }
 
-            const commandText = await vscode.window.showInputBox({
-              placeHolder: "Enter command to save",
-              prompt: `Add command to category: ${categoryName}`,
-              value: clipboardText,
-            });
+            const commandText = await createMultilineInputBox(
+              `Add Command to ${categoryName}`,
+              "Enter the command content",
+              clipboardText
+            );
 
             if (commandText) {
               await dataService.addCommand(commandText, categoryName);
