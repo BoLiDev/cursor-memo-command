@@ -1,0 +1,66 @@
+{
+  "name": "cursor-memo-plugin",
+  "displayName": "Cursor Memo Plugin",
+  "description": "保存和复用 Cursor 聊天指令的插件",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cursor-memo.saveCommand",
+        "title": "保存当前指令",
+        "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.removeCommand",
+        "title": "删除指令",
+        "category": "Cursor Memo"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "cursorMemoPanel",
+          "name": "指令备忘录"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "cursor-memo.removeCommand",
+          "when": "view == cursorMemoPanel",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.60.0",
+    "@types/glob": "^7.1.3",
+    "@types/node": "^12.11.7",
+    "eslint": "^7.19.0",
+    "@typescript-eslint/eslint-plugin": "^4.14.1",
+    "@typescript-eslint/parser": "^4.14.1",
+    "glob": "^7.1.6",
+    "typescript": "^4.1.3",
+    "vscode-test": "^1.5.0"
+  }
+}
