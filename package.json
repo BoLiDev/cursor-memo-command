@@ -3,6 +3,10 @@
   "displayName": "Cursor Memo Plugin",
   "description": "Plugin to save and reuse Cursor chat commands",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BoLiDev/cursor-memo-command.git"
+  },
   "engines": {
     "vscode": "^1.60.0"
   },
