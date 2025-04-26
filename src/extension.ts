@@ -11,6 +11,7 @@ export interface MemoItem {
   label: string;
   command: string;
   timestamp: number;
+  alias?: string; // Optional alias for the command
 }
 
 const STORAGE_KEY = "cursor-memo-commands";
@@ -21,8 +22,11 @@ const STORAGE_KEY = "cursor-memo-commands";
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel("Cursor Memo");
   outputChannel.appendLine("Cursor Memo Plugin activated");
+
   const storedCommands = context.globalState.get<MemoItem[]>(STORAGE_KEY, []);
+
   const memoTreeProvider = new MemoTreeDataProvider(storedCommands);
+
   const treeView = vscode.window.createTreeView("cursorMemoPanel", {
     treeDataProvider: memoTreeProvider,
     showCollapseAll: false,
@@ -54,8 +58,11 @@ export function activate(context: vscode.ExtensionContext) {
         };
 
         const updatedCommands = [...storedCommands, newItem];
+
         await context.globalState.update(STORAGE_KEY, updatedCommands);
+
         memoTreeProvider.refresh(updatedCommands);
+
         vscode.window.showInformationMessage("Command saved");
       }
     }
@@ -67,21 +74,87 @@ export function activate(context: vscode.ExtensionContext) {
       const updatedCommands = storedCommands.filter(
         (cmd: MemoItem) => cmd.id !== item.id
       );
+
       await context.globalState.update(STORAGE_KEY, updatedCommands);
+
       memoTreeProvider.refresh(updatedCommands);
       vscode.window.showInformationMessage("Command deleted");
     }
   );
+
+  /**
+   * Register command to rename a command (set alias)
+   */
+  const renameCommandDisposable = vscode.commands.registerCommand(
+    "cursor-memo.renameCommand",
+    async (item: MemoItem) => {
+      if (!item) return;
+
+      const alias = await vscode.window.showInputBox({
+        placeHolder: "Enter new alias for the command",
+        prompt: "This will change how the command appears in the list",
+        value: item.alias || item.label,
+      });
+
+      if (alias !== undefined) {
+        const updatedCommands = storedCommands.map((cmd: MemoItem) => {
+          if (cmd.id === item.id) {
+            return { ...cmd, alias };
+          }
+          return cmd;
+        });
+
+        await context.globalState.update(STORAGE_KEY, updatedCommands);
+
+        memoTreeProvider.refresh(updatedCommands);
+        vscode.window.showInformationMessage("Command renamed");
+      }
+    }
+  );
+
+  /**
+   * Register command to paste directly to editor
+   */
+  const pasteToEditorDisposable = vscode.commands.registerCommand(
+    "cursor-memo.pasteToEditor",
+    async (item: MemoItem) => {
+      if (!item) return;
+
+      // Copy to clipboard
+      await vscode.env.clipboard.writeText(item.command);
+
+      // Try to focus and paste without confirmation
+      await directPaste();
+    }
+  );
+
+  /**
+   * Focus to active editor and paste directly
+   */
+  async function directPaste(): Promise<void> {
+    // Try to activate editor first
+    await vscode.commands.executeCommand(
+      "workbench.action.focusActiveEditorGroup"
+    );
+
+    // Wait a bit for the focus to happen
+    setTimeout(async () => {
+      // Execute paste command
+      await vscode.commands.executeCommand(
+        "editor.action.clipboardPasteAction"
+      );
+    }, 100);
+  }
+
+  // Update TreeItem view to add command context for paste
+  memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
   treeView.onDidChangeSelection(
     async (e: vscode.TreeViewSelectionChangeEvent<any>) => {
       const selectedItems = e.selection;
       if (selectedItems.length > 0) {
         const item = selectedItems[0] as MemoItem;
-        await vscode.env.clipboard.writeText(item.command);
-        vscode.window.showInformationMessage(
-          "Command copied to clipboard, please paste it manually to Cursor Chatbox"
-        );
+        await vscode.commands.executeCommand("cursor-memo.pasteToEditor", item);
       }
     }
   );
@@ -89,6 +162,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     saveCommandDisposable,
     removeCommandDisposable,
+    renameCommandDisposable,
+    pasteToEditorDisposable,
     treeView,
     outputChannel
   );

@@ -15,9 +15,17 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
   > = this._onDidChangeTreeData.event;
 
   private memoItems: MemoItem[] = [];
+  private commandCallback: string | undefined;
 
   constructor(initialItems: MemoItem[]) {
     this.memoItems = initialItems;
+  }
+
+  /**
+   * Set command to execute when item is clicked
+   */
+  setCommandCallback(commandId: string): void {
+    this.commandCallback = commandId;
   }
 
   /**
@@ -32,15 +40,30 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
    * Get tree item
    */
   getTreeItem(element: MemoItem): vscode.TreeItem {
+    // Use alias if available, otherwise use label
+    const displayName = element.alias || element.label;
+
     const treeItem = new vscode.TreeItem(
-      element.label,
+      displayName,
       vscode.TreeItemCollapsibleState.None
     );
 
     treeItem.description = new Date(element.timestamp).toLocaleString();
     treeItem.iconPath = new vscode.ThemeIcon("note");
+
+    // Show command text in tooltip for better usability
     treeItem.tooltip = element.command;
+
+    // Set context value for menu contributions
     treeItem.contextValue = "memoItem";
+
+    if (this.commandCallback) {
+      treeItem.command = {
+        command: this.commandCallback,
+        title: "Execute Command",
+        arguments: [element],
+      };
+    }
 
     return treeItem;
   }

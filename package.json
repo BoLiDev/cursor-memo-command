@@ -24,6 +24,16 @@
         "command": "cursor-memo.removeCommand",
         "title": "Delete Command",
         "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.pasteToEditor",
+        "title": "Paste to Cursor Chatbox",
+        "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.renameCommand",
+        "title": "Rename Command (Set Alias)",
+        "category": "Cursor Memo"
       }
     ],
     "views": {
@@ -39,7 +49,12 @@
         {
           "command": "cursor-memo.removeCommand",
           "when": "view == cursorMemoPanel",
-          "group": "inline"
+          "group": "1_modification"
+        },
+        {
+          "command": "cursor-memo.renameCommand",
+          "when": "view == cursorMemoPanel",
+          "group": "1_modification"
         }
       ]
     }
