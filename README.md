@@ -12,6 +12,7 @@ A plugin for saving and reusing Cursor chat commands.
 - Right-click menu options for managing commands:
   - Rename commands (set custom aliases for better readability)
   - Delete commands
+  - Move commands between categories
 
 ## Usage
 
@@ -20,9 +21,7 @@ A plugin for saving and reusing Cursor chat commands.
 3. Enter or paste the command you want to save (input box will show clipboard content by default)
 4. View saved commands in the "Command Memo" view in the sidebar
 5. **Single-click** on a command to:
-   - Automatically copy it to clipboard
-   - Focus the editor
-   - Paste the command directly into Cursor Chatbox
+   - Automatically copy it into Cursor Chatbox
 6. **Right-click** on a command to access additional options:
    - Rename (set a custom alias/display name)
    - Delete
@@ -53,8 +52,10 @@ Press F5 to start a debugging session, which will open a new VS Code window with
 npm install -g vsce
 
 # Package the extension
-vsce package
+npm run package
 ```
+
+Once packaged, the extension will be located in root directory, right click on the extension file and select `Install Extension VSIX` to install it.
 
 ## License
 
