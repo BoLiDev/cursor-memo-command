@@ -133,9 +133,7 @@ export function activate(context: vscode.ExtensionContext) {
    */
   async function directPaste(): Promise<void> {
     // Try to activate editor first
-    await vscode.commands.executeCommand(
-      "workbench.action.focusActiveEditorGroup"
-    );
+    await vscode.commands.executeCommand("composer.startComposerPrompt");
 
     // Wait a bit for the focus to happen
     setTimeout(async () => {
@@ -148,16 +146,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Update TreeItem view to add command context for paste
   memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
-
-  treeView.onDidChangeSelection(
-    async (e: vscode.TreeViewSelectionChangeEvent<any>) => {
-      const selectedItems = e.selection;
-      if (selectedItems.length > 0) {
-        const item = selectedItems[0] as MemoItem;
-        await vscode.commands.executeCommand("cursor-memo.pasteToEditor", item);
-      }
-    }
-  );
 
   context.subscriptions.push(
     saveCommandDisposable,
