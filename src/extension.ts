@@ -144,6 +144,48 @@ export function activate(context: vscode.ExtensionContext) {
     }, 100);
   }
 
+  /**
+   * Register command to edit command content
+   */
+  const editCommandDisposable = vscode.commands.registerCommand(
+    "cursor-memo.editCommand",
+    async (item: MemoItem) => {
+      if (!item) return;
+
+      // 显示输入框让用户编辑命令内容
+      const editedCommand = await vscode.window.showInputBox({
+        placeHolder: "Edit command content",
+        prompt: "Modify the command content",
+        value: item.command,
+      });
+
+      if (editedCommand !== undefined && editedCommand !== item.command) {
+        // 更新命令内容，保留其他属性
+        const updatedCommands = storedCommands.map((cmd: MemoItem) => {
+          if (cmd.id === item.id) {
+            // 如果命令内容很长，可能需要更新标签
+            const newLabel =
+              editedCommand.length > 30
+                ? `${editedCommand.slice(0, 30)}...`
+                : editedCommand;
+
+            return {
+              ...cmd,
+              command: editedCommand,
+              // 如果没有自定义别名，才更新标签
+              label: cmd.alias ? cmd.label : newLabel,
+            };
+          }
+          return cmd;
+        });
+
+        await context.globalState.update(STORAGE_KEY, updatedCommands);
+        memoTreeProvider.refresh(updatedCommands);
+        vscode.window.showInformationMessage("Command updated");
+      }
+    }
+  );
+
   // Update TreeItem view to add command context for paste
   memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
@@ -152,6 +194,7 @@ export function activate(context: vscode.ExtensionContext) {
     removeCommandDisposable,
     renameCommandDisposable,
     pasteToEditorDisposable,
+    editCommandDisposable,
     treeView,
     outputChannel
   );

@@ -34,6 +34,11 @@
         "command": "cursor-memo.renameCommand",
         "title": "Rename Command (Set Alias)",
         "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.editCommand",
+        "title": "Edit Command Content",
+        "category": "Cursor Memo"
       }
     ],
     "views": {
@@ -55,6 +60,11 @@
           "command": "cursor-memo.renameCommand",
           "when": "view == cursorMemoPanel",
           "group": "1_modification"
+        },
+        {
+          "command": "cursor-memo.editCommand",
+          "when": "view == cursorMemoPanel",
+          "group": "1_modification@1"
         }
       ]
     }
