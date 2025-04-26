@@ -22,7 +22,7 @@
       },
       {
         "command": "cursor-memo.removeCommand",
-        "title": "Delete Command",
+        "title": "Delete",
         "category": "Cursor Memo"
       },
       {
@@ -32,12 +32,33 @@
       },
       {
         "command": "cursor-memo.renameCommand",
-        "title": "Rename Command (Set Alias)",
+        "title": "Rename",
         "category": "Cursor Memo"
       },
       {
         "command": "cursor-memo.editCommand",
-        "title": "Edit Command Content",
+        "title": "Edit",
+        "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.addCategory",
+        "title": "Add Category",
+        "category": "Cursor Memo",
+        "icon": "$(add)"
+      },
+      {
+        "command": "cursor-memo.renameCategory",
+        "title": "Rename",
+        "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.moveToCategory",
+        "title": "Move to Category",
+        "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.deleteCategory",
+        "title": "Delete",
         "category": "Cursor Memo"
       }
     ],
@@ -52,19 +73,41 @@
     "menus": {
       "view/item/context": [
         {
-          "command": "cursor-memo.removeCommand",
-          "when": "view == cursorMemoPanel",
-          "group": "1_modification"
-        },
-        {
           "command": "cursor-memo.renameCommand",
-          "when": "view == cursorMemoPanel",
-          "group": "1_modification"
+          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "group": "1_modification@1"
         },
         {
           "command": "cursor-memo.editCommand",
-          "when": "view == cursorMemoPanel",
+          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "group": "1_modification@2"
+        },
+        {
+          "command": "cursor-memo.removeCommand",
+          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "group": "1_modification@3"
+        },
+        {
+          "command": "cursor-memo.moveToCategory",
+          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "group": "2_organize"
+        },
+        {
+          "command": "cursor-memo.renameCategory",
+          "when": "view == cursorMemoPanel && viewItem == category",
           "group": "1_modification@1"
+        },
+        {
+          "command": "cursor-memo.deleteCategory",
+          "when": "view == cursorMemoPanel && viewItem == category",
+          "group": "1_modification@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "cursor-memo.addCategory",
+          "when": "view == cursorMemoPanel",
+          "group": "navigation"
         }
       ]
     }
