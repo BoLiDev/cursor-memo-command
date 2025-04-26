@@ -37,16 +37,9 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
       vscode.TreeItemCollapsibleState.None
     );
 
-    // 设置项目的描述（可选）
     treeItem.description = new Date(element.timestamp).toLocaleString();
-
-    // 设置图标（可选）
     treeItem.iconPath = new vscode.ThemeIcon("note");
-
-    // 设置工具提示
     treeItem.tooltip = element.command;
-
-    // 设置上下文值，用于在右键菜单中区分项目
     treeItem.contextValue = "memoItem";
 
     return treeItem;
@@ -56,13 +49,10 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
    * 获取子节点
    */
   getChildren(element?: MemoItem): MemoItem[] {
-    // 如果提供了 element，则返回其子节点
-    // 在我们的例子中，指令列表是扁平的，没有子节点
     if (element) {
       return [];
     }
 
-    // 返回根级别的项目
     return this.memoItems.sort((a, b) => b.timestamp - a.timestamp);
   }
 
@@ -70,6 +60,6 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
    * 获取父节点
    */
   getParent(element: MemoItem): vscode.ProviderResult<MemoItem> {
-    return null; // 扁平结构，没有父节点
+    return null;
   }
 }
