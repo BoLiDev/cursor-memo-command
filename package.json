@@ -65,6 +65,12 @@
         "command": "cursor-memo.deleteCategory",
         "title": "Delete",
         "category": "Cursor Memo"
+      },
+      {
+        "command": "cursor-memo.addCommandToCategory",
+        "title": "Add Command to this Category",
+        "category": "Cursor Memo",
+        "icon": "$(add)"
       }
     ],
     "views": {
@@ -106,6 +112,11 @@
           "command": "cursor-memo.deleteCategory",
           "when": "view == cursorMemoPanel && viewItem == category",
           "group": "1_modification@2"
+        },
+        {
+          "command": "cursor-memo.addCommandToCategory",
+          "when": "view == cursorMemoPanel && viewItem == category",
+          "group": "inline"
         }
       ],
       "view/title": [

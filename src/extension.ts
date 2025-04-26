@@ -1,7 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { MemoTreeDataProvider } from "./memoTreeDataProvider";
+import { MemoTreeDataProvider, CategoryTreeItem } from "./memoTreeDataProvider";
 import { MemoDataService, MemoItem } from "./memoDataService";
 
 /**
@@ -353,6 +353,42 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
+      const addCommandToCategory = vscode.commands.registerCommand(
+        "cursor-memo.addCommandToCategory",
+        async (categoryItem: CategoryTreeItem) => {
+          try {
+            if (!categoryItem) return;
+
+            const categoryName = categoryItem.label;
+
+            let clipboardText = "";
+            try {
+              clipboardText = await vscode.env.clipboard.readText();
+            } catch (error) {
+              // Ignore clipboard errors
+            }
+
+            const commandText = await vscode.window.showInputBox({
+              placeHolder: "Enter command to save",
+              prompt: `Add command to category: ${categoryName}`,
+              value: clipboardText,
+            });
+
+            if (commandText) {
+              await dataService.addCommand(commandText, categoryName);
+              memoTreeProvider.updateView();
+              vscode.window.showInformationMessage(
+                `Command added to ${categoryName}`
+              );
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Error adding command to category: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+      );
+
       memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
       context.subscriptions.push(
@@ -365,6 +401,7 @@ export function activate(context: vscode.ExtensionContext) {
         renameCategoryDisposable,
         deleteCategoryDisposable,
         moveToCategory,
+        addCommandToCategory,
         treeView,
         outputChannel
       );
