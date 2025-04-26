@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import { MemoItem, MemoDataService } from "./memoDataService";
 
 /**
- * 分类节点类型
+ * Category node type
  */
 export class CategoryTreeItem extends vscode.TreeItem {
   constructor(
@@ -18,7 +18,7 @@ export class CategoryTreeItem extends vscode.TreeItem {
 }
 
 /**
- * TreeView数据提供者 - 负责呈现视图
+ * TreeView data provider - responsible for rendering the view
  */
 export class MemoTreeDataProvider
   implements vscode.TreeDataProvider<CategoryTreeItem | MemoItem>
@@ -55,7 +55,9 @@ export class MemoTreeDataProvider
   }
 
   /**
-   * 更新分类映射
+   * Update categories map
+   * Clears and rebuilds the categories and categoryNodes maps
+   * Organizes commands by category and sorts them by timestamp
    */
   private updateCategoriesMap(): void {
     this.categories.clear();

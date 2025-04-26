@@ -311,7 +311,7 @@ export class MemoDataService {
   }
 
   /**
-   * 保存命令到存储
+   * Save commands to storage
    */
   private async saveCommands(): Promise<void> {
     await this.context.globalState.update(
@@ -321,7 +321,7 @@ export class MemoDataService {
   }
 
   /**
-   * 保存分类到存储
+   * Save categories to storage
    */
   private async saveCategories(): Promise<void> {
     await this.context.globalState.update(

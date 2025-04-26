@@ -32,7 +32,9 @@ export function activate(context: vscode.ExtensionContext) {
             let clipboardText = "";
             try {
               clipboardText = await vscode.env.clipboard.readText();
-            } catch (error) {}
+            } catch (error) {
+              // Ignore clipboard errors
+            }
 
             const commandText = await vscode.window.showInputBox({
               placeHolder: "Enter command to save",
@@ -170,8 +172,8 @@ export function activate(context: vscode.ExtensionContext) {
         async () => {
           try {
             const categoryName = await vscode.window.showInputBox({
-              placeHolder: "输入新分类名称",
-              prompt: "请输入新分类的名称",
+              placeHolder: "Enter new category name",
+              prompt: "Please enter the name for the new category",
             });
 
             if (categoryName && categoryName.trim()) {
@@ -182,11 +184,11 @@ export function activate(context: vscode.ExtensionContext) {
               if (success) {
                 memoTreeProvider.updateView();
                 vscode.window.showInformationMessage(
-                  `分类 "${categoryName}" 已创建`
+                  `Category "${categoryName}" created`
                 );
               } else {
                 vscode.window.showInformationMessage(
-                  `分类 "${categoryName}" 已存在`
+                  `Category "${categoryName}" already exists`
                 );
               }
             }
@@ -208,13 +210,15 @@ export function activate(context: vscode.ExtensionContext) {
             const defaultCategory = dataService.getDefaultCategory();
 
             if (oldCategoryName === defaultCategory) {
-              vscode.window.showInformationMessage(`不能重命名默认分类`);
+              vscode.window.showInformationMessage(
+                `Cannot rename the default category`
+              );
               return;
             }
 
             const newCategoryName = await vscode.window.showInputBox({
-              placeHolder: "输入新分类名称",
-              prompt: "请输入新分类的名称",
+              placeHolder: "Enter new category name",
+              prompt: "Please enter the new name for the category",
               value: oldCategoryName,
             });
 
@@ -231,11 +235,11 @@ export function activate(context: vscode.ExtensionContext) {
               if (success) {
                 memoTreeProvider.updateView();
                 vscode.window.showInformationMessage(
-                  `分类已重命名为 "${newCategoryName}"`
+                  `Category renamed to "${newCategoryName}"`
                 );
               } else {
                 vscode.window.showInformationMessage(
-                  `分类 "${newCategoryName}" 已存在或操作失败`
+                  `Category "${newCategoryName}" already exists or operation failed`
                 );
               }
             }
@@ -257,17 +261,19 @@ export function activate(context: vscode.ExtensionContext) {
             const defaultCategory = dataService.getDefaultCategory();
 
             if (categoryName === defaultCategory) {
-              vscode.window.showInformationMessage(`不能删除默认分类`);
+              vscode.window.showInformationMessage(
+                `Cannot delete the default category`
+              );
               return;
             }
 
             const confirmation = await vscode.window.showWarningMessage(
-              `确定要删除分类 "${categoryName}" 吗？该分类下的命令将移至默认分类。`,
+              `Are you sure you want to delete category "${categoryName}"? Commands in this category will be moved to the default category.`,
               { modal: true },
-              "删除"
+              "Delete"
             );
 
-            if (confirmation !== "删除") {
+            if (confirmation !== "Delete") {
               return;
             }
 
@@ -278,11 +284,11 @@ export function activate(context: vscode.ExtensionContext) {
 
               if (result.commandsMoved > 0) {
                 vscode.window.showInformationMessage(
-                  `分类 "${categoryName}" 已删除，${result.commandsMoved} 个命令已移至默认分类`
+                  `Category "${categoryName}" deleted, ${result.commandsMoved} commands moved to the default category`
                 );
               } else {
                 vscode.window.showInformationMessage(
-                  `分类 "${categoryName}" 已删除`
+                  `Category "${categoryName}" deleted`
                 );
               }
             }
@@ -308,11 +314,11 @@ export function activate(context: vscode.ExtensionContext) {
 
             if (categoryOptions.length === 0) {
               const result = await vscode.window.showInformationMessage(
-                "没有可用的目标分类。要创建新分类吗？",
-                "创建"
+                "No target categories available. Create a new category?",
+                "Create"
               );
 
-              if (result === "创建") {
+              if (result === "Create") {
                 vscode.commands.executeCommand("cursor-memo.addCategory");
               }
 
@@ -322,7 +328,7 @@ export function activate(context: vscode.ExtensionContext) {
             const targetCategory = await vscode.window.showQuickPick(
               categoryOptions,
               {
-                placeHolder: "选择目标分类",
+                placeHolder: "Select target category",
               }
             );
 
@@ -335,7 +341,7 @@ export function activate(context: vscode.ExtensionContext) {
               if (success) {
                 memoTreeProvider.updateView();
                 vscode.window.showInformationMessage(
-                  `命令已移动到 "${targetCategory}"`
+                  `Command moved to "${targetCategory}"`
                 );
               }
             }
