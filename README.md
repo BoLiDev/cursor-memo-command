@@ -2,51 +2,51 @@
 
 # Cursor Memo Plugin
 
-Cursor 聊天指令备忘录插件，用于保存和复用常用的 Cursor 聊天指令。
+A plugin for saving and reusing Cursor chat commands.
 
-## 功能
+## Features
 
-- 保存常用的 Cursor 聊天指令
-- 在侧边栏显示指令列表
-- 点击指令自动复制到剪贴板，方便粘贴到 Cursor Chatbox
+- Save frequently used Cursor chat commands
+- Display command list in the sidebar
+- Click on a command to copy it to clipboard for pasting into Cursor Chatbox
 
-## 使用方法
+## Usage
 
-1. 打开 Cursor 编辑器
-2. 通过命令面板（按 Ctrl+Shift+P 或 Cmd+Shift+P）执行 `Cursor Memo: 保存当前指令` 命令
-3. 输入或粘贴要保存的指令
-4. 在侧边栏的 "指令备忘录" 视图中查看保存的指令
-5. 点击指令即可复制到剪贴板，然后粘贴到 Cursor Chatbox
+1. Open Cursor editor
+2. Execute the `Cursor Memo: Save Current Command` command via the command palette (Ctrl+Shift+P or Cmd+Shift+P)
+3. Enter or paste the command you want to save (input box will show clipboard content by default)
+4. View saved commands in the "Command Memo" view in the sidebar
+5. Click on a command to copy it to clipboard, then paste it into the Cursor Chatbox
 
-## 开发
+## Development
 
-### 准备环境
+### Setup
 
 ```bash
-# 安装依赖
+# Install dependencies
 npm install
 
-# 编译
+# Compile
 npm run compile
 
-# 监视模式
+# Watch mode
 npm run watch
 ```
 
-### 测试插件
+### Testing the Extension
 
-按 F5 启动调试会话，将打开一个新的 VS Code 窗口，其中已加载此插件。
+Press F5 to start a debugging session, which will open a new VS Code window with the extension loaded.
 
-### 打包插件
+### Packaging the Extension
 
 ```bash
-# 安装 vsce 工具
+# Install vsce tool
 npm install -g vsce
 
-# 打包插件
+# Package the extension
 vsce package
 ```
 
-## 许可
+## License
 
 MIT

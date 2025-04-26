@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import { MemoItem } from "./extension";
 
 /**
- * TreeView 数据提供者，负责将指令列表显示在侧边栏
+ * TreeView data provider for displaying command list in the sidebar
  */
 export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<
@@ -21,7 +21,7 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
   }
 
   /**
-   * 刷新 TreeView 数据
+   * Refresh TreeView data
    */
   refresh(newItems: MemoItem[]): void {
     this.memoItems = newItems;
@@ -29,7 +29,7 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
   }
 
   /**
-   * 获取树节点
+   * Get tree item
    */
   getTreeItem(element: MemoItem): vscode.TreeItem {
     const treeItem = new vscode.TreeItem(
@@ -46,7 +46,7 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
   }
 
   /**
-   * 获取子节点
+   * Get children
    */
   getChildren(element?: MemoItem): MemoItem[] {
     if (element) {
@@ -57,7 +57,7 @@ export class MemoTreeDataProvider implements vscode.TreeDataProvider<MemoItem> {
   }
 
   /**
-   * 获取父节点
+   * Get parent
    */
   getParent(element: MemoItem): vscode.ProviderResult<MemoItem> {
     return null;

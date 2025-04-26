@@ -1,7 +1,7 @@
 {
   "name": "cursor-memo-plugin",
   "displayName": "Cursor Memo Plugin",
-  "description": "保存和复用 Cursor 聊天指令的插件",
+  "description": "Plugin to save and reuse Cursor chat commands",
   "version": "0.1.0",
   "engines": {
     "vscode": "^1.60.0"
@@ -17,12 +17,12 @@
     "commands": [
       {
         "command": "cursor-memo.saveCommand",
-        "title": "保存当前指令",
+        "title": "Save Current Command",
         "category": "Cursor Memo"
       },
       {
         "command": "cursor-memo.removeCommand",
-        "title": "删除指令",
+        "title": "Delete Command",
         "category": "Cursor Memo"
       }
     ],
@@ -30,7 +30,7 @@
       "explorer": [
         {
           "id": "cursorMemoPanel",
-          "name": "指令备忘录"
+          "name": "Command Memo"
         }
       ]
     },

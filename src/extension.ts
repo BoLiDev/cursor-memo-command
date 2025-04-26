@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import { MemoTreeDataProvider } from "./memoTreeDataProvider";
 
 /**
- * 指令备忘录项目的数据结构
+ * Data structure for command memo items
  */
 export interface MemoItem {
   id: string;
@@ -16,12 +16,11 @@ export interface MemoItem {
 const STORAGE_KEY = "cursor-memo-commands";
 
 /**
- * 扩展激活时执行
+ * Extension activation
  */
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel("Cursor Memo");
-  outputChannel.appendLine("Cursor Memo Plugin 已激活");
-
+  outputChannel.appendLine("Cursor Memo Plugin activated");
   const storedCommands = context.globalState.get<MemoItem[]>(STORAGE_KEY, []);
   const memoTreeProvider = new MemoTreeDataProvider(storedCommands);
   const treeView = vscode.window.createTreeView("cursorMemoPanel", {
@@ -32,9 +31,15 @@ export function activate(context: vscode.ExtensionContext) {
   const saveCommandDisposable = vscode.commands.registerCommand(
     "cursor-memo.saveCommand",
     async () => {
+      let clipboardText = "";
+      try {
+        clipboardText = await vscode.env.clipboard.readText();
+      } catch (error) {}
+
       const commandText = await vscode.window.showInputBox({
-        placeHolder: "输入要保存的指令",
-        prompt: "输入或粘贴要保存的指令内容",
+        placeHolder: "Enter command to save",
+        prompt: "Enter or paste the command content",
+        value: clipboardText,
       });
 
       if (commandText) {
@@ -51,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
         const updatedCommands = [...storedCommands, newItem];
         await context.globalState.update(STORAGE_KEY, updatedCommands);
         memoTreeProvider.refresh(updatedCommands);
-        vscode.window.showInformationMessage("指令已保存");
+        vscode.window.showInformationMessage("Command saved");
       }
     }
   );
@@ -64,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
       await context.globalState.update(STORAGE_KEY, updatedCommands);
       memoTreeProvider.refresh(updatedCommands);
-      vscode.window.showInformationMessage("指令已删除");
+      vscode.window.showInformationMessage("Command deleted");
     }
   );
 
@@ -75,7 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
         const item = selectedItems[0] as MemoItem;
         await vscode.env.clipboard.writeText(item.command);
         vscode.window.showInformationMessage(
-          "指令已复制到剪贴板，请手动粘贴到 Cursor Chatbox"
+          "Command copied to clipboard, please paste it manually to Cursor Chatbox"
         );
       }
     }
@@ -89,6 +94,9 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
+/**
+ * Extension deactivation
+ */
 export function deactivate() {
-  vscode.window.showInformationMessage("Cursor Memo Plugin 已停用");
+  vscode.window.showInformationMessage("Cursor Memo Plugin deactivated");
 }
