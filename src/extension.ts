@@ -551,6 +551,65 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
+      const exportCommands = vscode.commands.registerCommand(
+        "cursor-memo.exportCommands",
+        async () => {
+          try {
+            //
+            const exportData = dataService.exportData();
+
+            const tempFile = await vscode.workspace.openTextDocument({
+              content: exportData,
+              language: "json",
+            });
+
+            const document = await vscode.window.showTextDocument(tempFile);
+
+            vscode.window.showInformationMessage(
+              "Commands exported. Press Ctrl+S (Cmd+S on macOS) to save the JSON file."
+            );
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Error exporting commands: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+      );
+
+      const importCommands = vscode.commands.registerCommand(
+        "cursor-memo.importCommands",
+        async () => {
+          try {
+            const jsonData = await createMultilineInputBox(
+              "Import Commands",
+              "Paste the JSON data here",
+              ""
+            );
+
+            if (!jsonData) {
+              return;
+            }
+
+            const result = await dataService.importData(jsonData);
+
+            if (result.success) {
+              memoTreeProvider.updateView();
+              vscode.window.showInformationMessage(
+                `Successfully imported ${result.importedCommands} commands and ${result.importedCategories} categories.`
+              );
+            } else {
+              vscode.window.showErrorMessage(
+                "Failed to import data. Please ensure the JSON data is in the correct format."
+              );
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Error importing commands: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+      );
+
       memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
       context.subscriptions.push(
@@ -564,6 +623,8 @@ export function activate(context: vscode.ExtensionContext) {
         deleteCategoryDisposable,
         moveToCategory,
         addCommandToCategory,
+        exportCommands,
+        importCommands,
         treeView,
         outputChannel
       );

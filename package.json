@@ -2,7 +2,7 @@
   "name": "cursor-memo-plugin",
   "displayName": "Cursor Memo Plugin",
   "description": "Plugin to save and reuse Cursor chat commands",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/BoLiDev/cursor-memo-command.git"
@@ -71,6 +71,18 @@
         "title": "Add Command to this Category",
         "category": "Cursor Memo",
         "icon": "$(add)"
+      },
+      {
+        "command": "cursor-memo.exportCommands",
+        "title": "Export Commands",
+        "category": "Cursor Memo",
+        "icon": "$(export)"
+      },
+      {
+        "command": "cursor-memo.importCommands",
+        "title": "Import Commands",
+        "category": "Cursor Memo",
+        "icon": "$(import)"
       }
     ],
     "views": {
@@ -130,6 +142,18 @@
           "when": "view == cursorMemoPanel",
           "group": "navigation",
           "icon": "$(add-comment)"
+        },
+        {
+          "command": "cursor-memo.exportCommands",
+          "when": "view == cursorMemoPanel",
+          "group": "navigation",
+          "icon": "$(export)"
+        },
+        {
+          "command": "cursor-memo.importCommands",
+          "when": "view == cursorMemoPanel",
+          "group": "navigation",
+          "icon": "$(import)"
         }
       ]
     }

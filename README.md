@@ -13,6 +13,10 @@ A plugin for saving and reusing Cursor chat commands.
   - Rename commands (set custom aliases for better readability)
   - Delete commands
   - Move commands between categories
+- Import and export commands:
+  - Export all your commands and categories to a JSON file
+  - Import commands and categories from a JSON file
+  - Automatic deduplication during import
 
 ## Usage
 
@@ -25,6 +29,15 @@ A plugin for saving and reusing Cursor chat commands.
 6. **Right-click** on a command to access additional options:
    - Rename (set a custom alias/display name)
    - Delete
+
+### Import and Export
+
+1. To export your commands, click the export icon in the Command Memo view title bar
+   - This will open a temporary file with your commands and categories in JSON format
+   - Press Ctrl+S (or Cmd+S on macOS) to save the file to your desired location
+2. To import commands, click the import icon in the Command Memo view title bar
+   - Paste the JSON data in the input box that appears
+   - Commands and categories will be imported with automatic deduplication
 
 ## Development
 
