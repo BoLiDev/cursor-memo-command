@@ -311,8 +311,8 @@ export class MemoDataService {
   }
 
   /**
-   * 导出命令和分类数据为JSON字符串
-   * @returns 包含所有命令和分类数据的JSON字符串
+   * Export commands and categories data as a JSON string
+   * @returns JSON string containing all commands and categories data
    */
   public exportData(): string {
     const exportData = {
@@ -323,10 +323,10 @@ export class MemoDataService {
   }
 
   /**
-   * 从JSON字符串导入命令和分类数据
-   * 处理重复项：分类名称重复时保留原有的，命令重复时（基于内容判断）忽略导入
-   * @param jsonData 包含命令和分类数据的JSON字符串
-   * @returns 导入操作的结果：成功与否以及导入的命令和分类数量
+   * Import commands and categories data from a JSON string
+   * Handles duplicates: keeps existing categories if names conflict, ignores imported commands if content already exists
+   * @param jsonData JSON string containing commands and categories data
+   * @returns Result of the import operation: success status and counts of imported commands and categories
    */
   public async importData(jsonData: string): Promise<{
     success: boolean;
@@ -334,7 +334,6 @@ export class MemoDataService {
     importedCategories: number;
   }> {
     try {
-      // 解析JSON数据
       const data = JSON.parse(jsonData);
 
       if (
@@ -346,7 +345,6 @@ export class MemoDataService {
         return { success: false, importedCommands: 0, importedCategories: 0 };
       }
 
-      // 导入分类（去重）
       let importedCategories = 0;
       for (const category of data.categories) {
         if (
@@ -359,27 +357,22 @@ export class MemoDataService {
         }
       }
 
-      // 导入命令（去重 - 基于命令内容判断）
       let importedCommands = 0;
       const existingCommandContents = new Set(
         this.commands.map((cmd) => cmd.command)
       );
 
       for (const cmd of data.commands) {
-        // 验证命令数据结构
         if (!cmd.id || !cmd.command || !cmd.label || !cmd.timestamp) {
           continue;
         }
 
-        // 检查命令内容是否已存在
         if (!existingCommandContents.has(cmd.command)) {
-          // 确保分类存在，如果不存在则使用默认分类
           const category =
             cmd.category && this.categories.includes(cmd.category)
               ? cmd.category
               : MemoDataService.DEFAULT_CATEGORY;
 
-          // 创建新的命令ID以避免ID冲突
           const newCmd: MemoItem = {
             id:
               Date.now().toString() + Math.random().toString().substring(2, 8),
@@ -396,7 +389,6 @@ export class MemoDataService {
         }
       }
 
-      // 如果有导入的数据，保存到存储
       if (importedCategories > 0) {
         await this.saveCategories();
       }

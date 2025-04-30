@@ -188,3 +188,25 @@ export function showError(message: string, error: unknown): void {
     `${message}: ${error instanceof Error ? error.message : String(error)}`
   );
 }
+
+/**
+ * Creates and registers a VS Code command with error handling
+ * @param commandId The command ID to register
+ * @param callback The command handler function
+ * @param errorMessage Error message prefix to show if command fails
+ * @returns The disposable command registration
+ */
+export function createCommand<T = any>(
+  commandId: string,
+  callback: (...args: any[]) => Promise<T>,
+  errorMessage: string
+): vscode.Disposable {
+  return vscode.commands.registerCommand(commandId, async (...args: any[]) => {
+    try {
+      return await callback(...args);
+    } catch (error) {
+      showError(errorMessage, error);
+      return undefined;
+    }
+  });
+}

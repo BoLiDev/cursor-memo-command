@@ -1,8 +1,8 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { MemoTreeDataProvider, CategoryTreeItem } from "./memoTreeDataProvider";
-import { MemoDataService, MemoItem } from "./memoDataService";
+import { MemoTreeDataProvider } from "./memoTreeDataProvider";
+import { MemoDataService } from "./memoDataService";
 import { createCommand, showError } from "./utils";
 import {
   createSaveCommandHandler,
@@ -35,12 +35,6 @@ export function activate(context: vscode.ExtensionContext) {
     .then(() => {
       const memoTreeProvider = new MemoTreeDataProvider(dataService);
 
-      const treeView = vscode.window.createTreeView("cursorMemoPanel", {
-        treeDataProvider: memoTreeProvider,
-        showCollapseAll: false,
-      });
-
-      // Register commands
       const saveCommandDisposable = createCommand(
         "cursor-memo.saveCommand",
         createSaveCommandHandler(dataService, memoTreeProvider),
@@ -114,6 +108,11 @@ export function activate(context: vscode.ExtensionContext) {
       );
 
       memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
+
+      const treeView = vscode.window.createTreeView("cursorMemoPanel", {
+        treeDataProvider: memoTreeProvider,
+        showCollapseAll: false,
+      });
 
       context.subscriptions.push(
         saveCommandDisposable,
