@@ -3,7 +3,21 @@
 import * as vscode from "vscode";
 import { MemoTreeDataProvider, CategoryTreeItem } from "./memoTreeDataProvider";
 import { MemoDataService, MemoItem } from "./memoDataService";
-import { createMultilineInputBox, directPaste, showError } from "./utils";
+import { createCommand, showError } from "./utils";
+import {
+  createSaveCommandHandler,
+  createRemoveCommandHandler,
+  createRenameCommandHandler,
+  createPasteToEditorHandler,
+  createEditCommandHandler,
+  createAddCategoryHandler,
+  createRenameCategoryHandler,
+  createDeleteCategoryHandler,
+  createMoveToCategoryHandler,
+  createAddCommandToCategoryHandler,
+  createExportCommandsHandler,
+  createImportCommandsHandler,
+} from "./commands";
 
 /**
  * Extension activation function
@@ -26,386 +40,77 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: false,
       });
 
-      const saveCommandDisposable = vscode.commands.registerCommand(
+      // Register commands
+      const saveCommandDisposable = createCommand(
         "cursor-memo.saveCommand",
-        async () => {
-          try {
-            let clipboardText = "";
-            try {
-              clipboardText = await vscode.env.clipboard.readText();
-            } catch (error) {
-              // Ignore clipboard errors
-            }
-
-            const commandText = await createMultilineInputBox(
-              "Save Command",
-              "Enter or paste the command content",
-              clipboardText
-            );
-
-            if (commandText) {
-              await dataService.addCommand(commandText);
-              memoTreeProvider.updateView();
-              vscode.window.showInformationMessage("Command saved");
-            }
-          } catch (error) {
-            showError("Error saving command", error);
-          }
-        }
+        createSaveCommandHandler(dataService, memoTreeProvider),
+        "Error saving command"
       );
 
-      const removeCommandDisposable = vscode.commands.registerCommand(
+      const removeCommandDisposable = createCommand(
         "cursor-memo.removeCommand",
-        async (item: MemoItem) => {
-          try {
-            if (!item) return;
-
-            const success = await dataService.removeCommand(item.id);
-
-            if (success) {
-              memoTreeProvider.updateView();
-              vscode.window.showInformationMessage("Command deleted");
-            }
-          } catch (error) {
-            showError("Error removing command", error);
-          }
-        }
+        createRemoveCommandHandler(dataService, memoTreeProvider),
+        "Error removing command"
       );
 
-      const renameCommandDisposable = vscode.commands.registerCommand(
+      const renameCommandDisposable = createCommand(
         "cursor-memo.renameCommand",
-        async (item: MemoItem) => {
-          try {
-            if (!item) return;
-
-            const alias = await vscode.window.showInputBox({
-              placeHolder: "Enter new alias for the command",
-              prompt: "This will change how the command appears in the list",
-              value: item.alias || item.label,
-            });
-
-            if (alias !== undefined) {
-              const success = await dataService.renameCommand(item.id, alias);
-
-              if (success) {
-                memoTreeProvider.updateView();
-                vscode.window.showInformationMessage("Command renamed");
-              }
-            }
-          } catch (error) {
-            showError("Error renaming command", error);
-          }
-        }
+        createRenameCommandHandler(dataService, memoTreeProvider),
+        "Error renaming command"
       );
 
-      const pasteToEditorDisposable = vscode.commands.registerCommand(
+      const pasteToEditorDisposable = createCommand(
         "cursor-memo.pasteToEditor",
-        async (item: MemoItem) => {
-          try {
-            if (!item) return;
-
-            await vscode.env.clipboard.writeText(item.command);
-
-            await directPaste();
-          } catch (error) {
-            showError("Error pasting command", error);
-          }
-        }
+        createPasteToEditorHandler(),
+        "Error pasting command"
       );
 
-      const editCommandDisposable = vscode.commands.registerCommand(
+      const editCommandDisposable = createCommand(
         "cursor-memo.editCommand",
-        async (item: MemoItem) => {
-          try {
-            if (!item) return;
-
-            const editedCommand = await createMultilineInputBox(
-              "Edit Command Content",
-              "Modify command content",
-              item.command
-            );
-
-            if (editedCommand !== undefined && editedCommand !== item.command) {
-              const success = await dataService.editCommand(
-                item.id,
-                editedCommand
-              );
-
-              if (success) {
-                memoTreeProvider.updateView();
-                vscode.window.showInformationMessage("Command updated");
-              }
-            }
-          } catch (error) {
-            showError("Error editing command", error);
-          }
-        }
+        createEditCommandHandler(dataService, memoTreeProvider),
+        "Error editing command"
       );
 
-      const addCategoryDisposable = vscode.commands.registerCommand(
+      const addCategoryDisposable = createCommand(
         "cursor-memo.addCategory",
-        async () => {
-          try {
-            const categoryName = await vscode.window.showInputBox({
-              placeHolder: "Enter new category name",
-              prompt: "Please enter the name for the new category",
-            });
-
-            if (categoryName && categoryName.trim()) {
-              const success = await dataService.addCategory(
-                categoryName.trim()
-              );
-
-              if (success) {
-                memoTreeProvider.updateView();
-                vscode.window.showInformationMessage(
-                  `Category "${categoryName}" created`
-                );
-              } else {
-                vscode.window.showInformationMessage(
-                  `Category "${categoryName}" already exists`
-                );
-              }
-            }
-          } catch (error) {
-            showError("Error adding category", error);
-          }
-        }
+        createAddCategoryHandler(dataService, memoTreeProvider),
+        "Error adding category"
       );
 
-      const renameCategoryDisposable = vscode.commands.registerCommand(
+      const renameCategoryDisposable = createCommand(
         "cursor-memo.renameCategory",
-        async (categoryItem) => {
-          try {
-            if (!categoryItem) return;
-
-            const oldCategoryName = categoryItem.label;
-            const defaultCategory = dataService.getDefaultCategory();
-
-            if (oldCategoryName === defaultCategory) {
-              vscode.window.showInformationMessage(
-                `Cannot rename the default category`
-              );
-              return;
-            }
-
-            const newCategoryName = await vscode.window.showInputBox({
-              placeHolder: "Enter new category name",
-              prompt: "Please enter the new name for the category",
-              value: oldCategoryName,
-            });
-
-            if (
-              newCategoryName &&
-              newCategoryName.trim() &&
-              newCategoryName !== oldCategoryName
-            ) {
-              const success = await dataService.renameCategory(
-                oldCategoryName,
-                newCategoryName.trim()
-              );
-
-              if (success) {
-                memoTreeProvider.updateView();
-                vscode.window.showInformationMessage(
-                  `Category renamed to "${newCategoryName}"`
-                );
-              } else {
-                vscode.window.showInformationMessage(
-                  `Category "${newCategoryName}" already exists or operation failed`
-                );
-              }
-            }
-          } catch (error) {
-            showError("Error renaming category", error);
-          }
-        }
+        createRenameCategoryHandler(dataService, memoTreeProvider),
+        "Error renaming category"
       );
 
-      const deleteCategoryDisposable = vscode.commands.registerCommand(
+      const deleteCategoryDisposable = createCommand(
         "cursor-memo.deleteCategory",
-        async (categoryItem) => {
-          try {
-            if (!categoryItem) return;
-
-            const categoryName = categoryItem.label;
-            const defaultCategory = dataService.getDefaultCategory();
-
-            if (categoryName === defaultCategory) {
-              vscode.window.showInformationMessage(
-                `Cannot delete the default category`
-              );
-              return;
-            }
-
-            const confirmation = await vscode.window.showWarningMessage(
-              `Are you sure you want to delete category "${categoryName}"? Commands in this category will be moved to the default category.`,
-              { modal: true },
-              "Delete"
-            );
-
-            if (confirmation !== "Delete") {
-              return;
-            }
-
-            const result = await dataService.deleteCategory(categoryName);
-
-            if (result.success) {
-              memoTreeProvider.updateView();
-
-              if (result.commandsMoved > 0) {
-                vscode.window.showInformationMessage(
-                  `Category "${categoryName}" deleted, ${result.commandsMoved} commands moved to the default category`
-                );
-              } else {
-                vscode.window.showInformationMessage(
-                  `Category "${categoryName}" deleted`
-                );
-              }
-            }
-          } catch (error) {
-            showError("Error deleting category", error);
-          }
-        }
+        createDeleteCategoryHandler(dataService, memoTreeProvider),
+        "Error deleting category"
       );
 
-      const moveToCategory = vscode.commands.registerCommand(
+      const moveToCategory = createCommand(
         "cursor-memo.moveToCategory",
-        async (item: MemoItem) => {
-          try {
-            if (!item) return;
-
-            const allCategories = dataService.getCategories();
-
-            const categoryOptions = allCategories.filter(
-              (cat) => cat !== item.category
-            );
-
-            if (categoryOptions.length === 0) {
-              const result = await vscode.window.showInformationMessage(
-                "No target categories available. Create a new category?",
-                "Create"
-              );
-
-              if (result === "Create") {
-                vscode.commands.executeCommand("cursor-memo.addCategory");
-              }
-
-              return;
-            }
-
-            const targetCategory = await vscode.window.showQuickPick(
-              categoryOptions,
-              {
-                placeHolder: "Select target category",
-              }
-            );
-
-            if (targetCategory) {
-              const success = await dataService.moveCommandToCategory(
-                item.id,
-                targetCategory
-              );
-
-              if (success) {
-                memoTreeProvider.updateView();
-                vscode.window.showInformationMessage(
-                  `Command moved to "${targetCategory}"`
-                );
-              }
-            }
-          } catch (error) {
-            showError("Error moving command", error);
-          }
-        }
+        createMoveToCategoryHandler(dataService, memoTreeProvider),
+        "Error moving command"
       );
 
-      const addCommandToCategory = vscode.commands.registerCommand(
+      const addCommandToCategory = createCommand(
         "cursor-memo.addCommandToCategory",
-        async (categoryItem: CategoryTreeItem) => {
-          try {
-            if (!categoryItem) return;
-
-            const categoryName = categoryItem.label;
-
-            let clipboardText = "";
-            try {
-              clipboardText = await vscode.env.clipboard.readText();
-            } catch (error) {
-              // Ignore clipboard errors
-            }
-
-            const commandText = await createMultilineInputBox(
-              `Add Command to ${categoryName}`,
-              "Enter the command content",
-              clipboardText
-            );
-
-            if (commandText) {
-              await dataService.addCommand(commandText, categoryName);
-              memoTreeProvider.updateView();
-              vscode.window.showInformationMessage(
-                `Command added to ${categoryName}`
-              );
-            }
-          } catch (error) {
-            showError("Error adding command to category", error);
-          }
-        }
+        createAddCommandToCategoryHandler(dataService, memoTreeProvider),
+        "Error adding command to category"
       );
 
-      const exportCommands = vscode.commands.registerCommand(
+      const exportCommands = createCommand(
         "cursor-memo.exportCommands",
-        async () => {
-          try {
-            const exportData = dataService.exportData();
-
-            const tempFile = await vscode.workspace.openTextDocument({
-              content: exportData,
-              language: "json",
-            });
-
-            const document = await vscode.window.showTextDocument(tempFile);
-
-            vscode.window.showInformationMessage(
-              "Commands exported. Press Ctrl+S (Cmd+S on macOS) to save the JSON file."
-            );
-          } catch (error) {
-            showError("Error exporting commands", error);
-          }
-        }
+        createExportCommandsHandler(dataService),
+        "Error exporting commands"
       );
 
-      const importCommands = vscode.commands.registerCommand(
+      const importCommands = createCommand(
         "cursor-memo.importCommands",
-        async () => {
-          try {
-            const jsonData = await createMultilineInputBox(
-              "Import Commands",
-              "Paste the JSON data here",
-              ""
-            );
-
-            if (!jsonData) {
-              return;
-            }
-
-            const result = await dataService.importData(jsonData);
-
-            if (result.success) {
-              memoTreeProvider.updateView();
-              vscode.window.showInformationMessage(
-                `Successfully imported ${result.importedCommands} commands and ${result.importedCategories} categories.`
-              );
-            } else {
-              vscode.window.showErrorMessage(
-                "Failed to import data. Please ensure the JSON data is in the correct format."
-              );
-            }
-          } catch (error) {
-            showError("Error importing commands", error);
-          }
-        }
+        createImportCommandsHandler(dataService, memoTreeProvider),
+        "Error importing commands"
       );
 
       memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
