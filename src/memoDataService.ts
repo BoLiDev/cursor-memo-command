@@ -323,6 +323,24 @@ export class MemoDataService {
   }
 
   /**
+   * Export selected categories and their commands data as a JSON string
+   * @param selectedCategories Array of category names to export
+   * @returns JSON string containing selected commands and categories data
+   */
+  public exportSelectedCategories(selectedCategories: string[]): string {
+    // Filter commands that belong to selected categories
+    const filteredCommands = this.commands.filter((cmd) =>
+      selectedCategories.includes(cmd.category)
+    );
+
+    const exportData = {
+      commands: filteredCommands,
+      categories: selectedCategories,
+    };
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  /**
    * Import commands and categories data from a JSON string
    * Handles duplicates: keeps existing categories if names conflict, ignores imported commands if content already exists
    * @param jsonData JSON string containing commands and categories data

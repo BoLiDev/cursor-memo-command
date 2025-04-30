@@ -368,7 +368,31 @@ export function createExportCommandsHandler(
   dataService: MemoDataService
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    const exportData = dataService.exportData();
+    const allCategories = dataService.getCategories();
+
+    // 提供给用户选择要导出的分类
+    const selectedCategories = await vscode.window.showQuickPick(
+      [...allCategories.map((category) => ({ label: category }))],
+      {
+        canPickMany: true,
+        placeHolder: "Select categories to export (空选表示导出所有分类)",
+        title: "Export Commands",
+      }
+    );
+
+    if (selectedCategories === undefined) {
+      return; // 用户取消了选择
+    }
+
+    // 获取导出数据
+    let exportData: string;
+    if (selectedCategories.length === 0) {
+      // 未选择任何分类时导出全部
+      exportData = dataService.exportData();
+    } else {
+      const categoriesToExport = selectedCategories.map((item) => item.label);
+      exportData = dataService.exportSelectedCategories(categoriesToExport);
+    }
 
     // 提供保存文件对话框让用户直接选择保存位置和文件名
     const defaultFileName = `cursor-memo-commands-${new Date().toISOString().slice(0, 10)}.json`;
