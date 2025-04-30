@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 
 /**
- * 命令备忘项数据结构
+ * Data structure for memo items
  */
 export interface MemoItem {
   id: string;
@@ -15,7 +15,7 @@ export interface MemoItem {
 }
 
 /**
- * 数据服务类 - 集中处理所有数据操作
+ * Data service for memo items
  */
 export class MemoDataService {
   private static STORAGE_KEY = "cursor-memo-commands";
