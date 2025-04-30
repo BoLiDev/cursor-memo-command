@@ -33,10 +33,10 @@ A plugin for saving and reusing Cursor chat commands.
 ### Import and Export
 
 1. To export your commands, click the export icon in the Command Memo view title bar
-   - This will open a temporary file with your commands and categories in JSON format
-   - Press Ctrl+S (or Cmd+S on macOS) to save the file to your desired location
+   - A file save dialog will open allowing you to choose where to save the JSON file
+   - Choose a location and filename, then click "Export"
 2. To import commands, click the import icon in the Command Memo view title bar
-   - Paste the JSON data in the input box that appears
+   - A file open dialog will appear - select a previously exported JSON file
    - Commands and categories will be imported with automatic deduplication
 
 ## Development

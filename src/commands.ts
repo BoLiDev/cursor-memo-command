@@ -370,16 +370,33 @@ export function createExportCommandsHandler(
   return async () => {
     const exportData = dataService.exportData();
 
-    const tempFile = await vscode.workspace.openTextDocument({
-      content: exportData,
-      language: "json",
+    // 提供保存文件对话框让用户直接选择保存位置和文件名
+    const defaultFileName = `cursor-memo-commands-${new Date().toISOString().slice(0, 10)}.json`;
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(defaultFileName),
+      filters: {
+        JSON: ["json"],
+      },
+      title: "Export Commands",
+      saveLabel: "Export",
     });
 
-    const document = await vscode.window.showTextDocument(tempFile);
-
-    vscode.window.showInformationMessage(
-      "Commands exported. Press Ctrl+S (Cmd+S on macOS) to save the JSON file."
-    );
+    if (uri) {
+      try {
+        // 将数据写入到用户选择的文件
+        await vscode.workspace.fs.writeFile(
+          uri,
+          Buffer.from(exportData, "utf-8")
+        );
+        vscode.window.showInformationMessage(
+          `Commands successfully exported to ${uri.fsPath}`
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to export commands: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
   };
 }
 
@@ -394,26 +411,41 @@ export function createImportCommandsHandler(
   memoTreeProvider: MemoTreeDataProvider
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    const jsonData = await createMultilineInputBox(
-      "Import Commands",
-      "Paste the JSON data here",
-      ""
-    );
+    // 提供文件选择对话框让用户直接选择文件
+    const uris = await vscode.window.showOpenDialog({
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: false,
+      filters: {
+        JSON: ["json"],
+      },
+      title: "Import Commands",
+    });
 
-    if (!jsonData) {
+    if (!uris || uris.length === 0) {
       return;
     }
 
-    const result = await dataService.importData(jsonData);
+    try {
+      // 读取用户选择的文件内容
+      const fileData = await vscode.workspace.fs.readFile(uris[0]);
+      const jsonData = Buffer.from(fileData).toString("utf-8");
 
-    if (result.success) {
-      memoTreeProvider.updateView();
-      vscode.window.showInformationMessage(
-        `Successfully imported ${result.importedCommands} commands and ${result.importedCategories} categories.`
-      );
-    } else {
+      const result = await dataService.importData(jsonData);
+
+      if (result.success) {
+        memoTreeProvider.updateView();
+        vscode.window.showInformationMessage(
+          `Successfully imported ${result.importedCommands} commands and ${result.importedCategories} categories.`
+        );
+      } else {
+        vscode.window.showErrorMessage(
+          "Failed to import data. Please ensure the JSON file is in the correct format."
+        );
+      }
+    } catch (error) {
       vscode.window.showErrorMessage(
-        "Failed to import data. Please ensure the JSON data is in the correct format."
+        `Failed to import commands: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   };
