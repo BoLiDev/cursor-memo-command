@@ -2,7 +2,7 @@
   "name": "cursor-memo-plugin",
   "displayName": "Cursor Memo Plugin",
   "description": "Plugin to save and reuse Cursor chat commands",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/BoLiDev/cursor-memo-command.git"
@@ -23,7 +23,7 @@
         "command": "cursor-memo.saveCommand",
         "title": "Save Current Command",
         "category": "Cursor Memo",
-        "icon": "$(save)"
+        "icon": "$(add)"
       },
       {
         "command": "cursor-memo.removeCommand",
@@ -49,7 +49,7 @@
         "command": "cursor-memo.addCategory",
         "title": "Add Category",
         "category": "Cursor Memo",
-        "icon": "$(add)"
+        "icon": "$(book)"
       },
       {
         "command": "cursor-memo.renameCategory",
@@ -76,13 +76,13 @@
         "command": "cursor-memo.exportCommands",
         "title": "Export Commands",
         "category": "Cursor Memo",
-        "icon": "$(export)"
+        "icon": "$(arrow-up)"
       },
       {
         "command": "cursor-memo.importCommands",
         "title": "Import Commands",
         "category": "Cursor Memo",
-        "icon": "$(import)"
+        "icon": "$(arrow-down)"
       }
     ],
     "views": {
@@ -133,27 +133,28 @@
       ],
       "view/title": [
         {
-          "command": "cursor-memo.addCategory",
-          "when": "view == cursorMemoPanel",
-          "group": "navigation"
-        },
-        {
           "command": "cursor-memo.saveCommand",
           "when": "view == cursorMemoPanel",
           "group": "navigation",
-          "icon": "$(add-comment)"
+          "icon": "$(add)"
+        },
+        {
+          "command": "cursor-memo.addCategory",
+          "when": "view == cursorMemoPanel",
+          "group": "navigation",
+          "icon": "$(book)"
         },
         {
           "command": "cursor-memo.exportCommands",
           "when": "view == cursorMemoPanel",
           "group": "navigation",
-          "icon": "$(export)"
+          "icon": "$(arrow-up)"
         },
         {
           "command": "cursor-memo.importCommands",
           "when": "view == cursorMemoPanel",
           "group": "navigation",
-          "icon": "$(import)"
+          "icon": "$(arrow-down)"
         }
       ]
     }
