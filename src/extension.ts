@@ -3,168 +3,7 @@
 import * as vscode from "vscode";
 import { MemoTreeDataProvider, CategoryTreeItem } from "./memoTreeDataProvider";
 import { MemoDataService, MemoItem } from "./memoDataService";
-
-/**
- * 创建多行输入界面
- * @param title 输入框标题
- * @param placeholder 占位符文本
- * @param initialValue 初始值
- * @returns Promise<string | undefined> 用户输入的内容或undefined（如果取消）
- */
-async function createMultilineInputBox(
-  title: string,
-  placeholder: string,
-  initialValue: string = ""
-): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    // 创建WebviewPanel
-    const panel = vscode.window.createWebviewPanel(
-      "multilineInput",
-      title,
-      {
-        viewColumn: vscode.ViewColumn.Active,
-        preserveFocus: false,
-      },
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-      }
-    );
-
-    // 设置初始尺寸
-    const initialWidth = 600;
-    const initialHeight = 400;
-    panel.webview.html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title}</title>
-        <style>
-          body, html {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            background-color: var(--vscode-editor-background);
-            color: var(--vscode-editor-foreground);
-            font-family: var(--vscode-font-family);
-            overflow: hidden;
-          }
-          .container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            max-height: 400px;
-            padding: 10px;
-            box-sizing: border-box;
-          }
-          textarea {
-            flex: 1;
-            resize: none;
-            padding: 8px;
-            min-height: 100px;
-            max-height: 300px;
-            background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
-            font-family: var(--vscode-editor-font-family);
-            font-size: var(--vscode-editor-font-size);
-            line-height: 1.5;
-            margin-bottom: 10px;
-          }
-          .buttons {
-            margin-top: 5px;
-            text-align: right;
-            flex-shrink: 0;
-          }
-          button {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            padding: 6px 12px;
-            cursor: pointer;
-            margin-left: 8px;
-          }
-          button:hover {
-            background-color: var(--vscode-button-hoverBackground);
-          }
-          .placeholder {
-            color: var(--vscode-input-placeholderForeground);
-            position: absolute;
-            pointer-events: none;
-            padding: 8px;
-            display: none;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="placeholder" id="placeholder">${placeholder}</div>
-          <textarea id="input" placeholder="${placeholder}" autofocus>${initialValue}</textarea>
-          <div class="buttons">
-            <button id="cancel">Cancel</button>
-            <button id="save">Save</button>
-          </div>
-        </div>
-        <script>
-          const vscode = acquireVsCodeApi();
-          const textarea = document.getElementById('input');
-
-          document.getElementById('save').addEventListener('click', () => {
-            vscode.postMessage({
-              type: 'save',
-              value: textarea.value
-            });
-          });
-
-          document.getElementById('cancel').addEventListener('click', () => {
-            vscode.postMessage({
-              type: 'cancel'
-            });
-          });
-
-          // 支持Ctrl+Enter或Cmd+Enter提交
-          textarea.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-              vscode.postMessage({
-                type: 'save',
-                value: textarea.value
-              });
-            }
-
-            if (e.key === 'Escape') {
-              vscode.postMessage({
-                type: 'cancel'
-              });
-            }
-          });
-
-          // 自动聚焦并将光标放到末尾
-          textarea.focus();
-          textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-        </script>
-      </body>
-      </html>
-    `;
-
-    // 处理消息
-    panel.webview.onDidReceiveMessage((message) => {
-      if (message.type === "save") {
-        resolve(message.value);
-        panel.dispose();
-      } else if (message.type === "cancel") {
-        resolve(undefined);
-        panel.dispose();
-      }
-    });
-
-    // 处理面板关闭
-    panel.onDidDispose(() => {
-      resolve(undefined);
-    });
-  });
-}
+import { createMultilineInputBox, directPaste, showError } from "./utils";
 
 /**
  * Extension activation function
@@ -210,9 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
               vscode.window.showInformationMessage("Command saved");
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error saving command: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error saving command", error);
           }
         }
       );
@@ -230,9 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
               vscode.window.showInformationMessage("Command deleted");
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error removing command: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error removing command", error);
           }
         }
       );
@@ -258,9 +93,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error renaming command: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error renaming command", error);
           }
         }
       );
@@ -275,28 +108,10 @@ export function activate(context: vscode.ExtensionContext) {
 
             await directPaste();
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error pasting command: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error pasting command", error);
           }
         }
       );
-
-      async function directPaste(): Promise<void> {
-        try {
-          await vscode.commands.executeCommand("composer.startComposerPrompt");
-
-          setTimeout(async () => {
-            await vscode.commands.executeCommand(
-              "editor.action.clipboardPasteAction"
-            );
-          }, 100);
-        } catch (error) {
-          vscode.window.showErrorMessage(
-            `Error during paste: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-      }
 
       const editCommandDisposable = vscode.commands.registerCommand(
         "cursor-memo.editCommand",
@@ -322,9 +137,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error editing command: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error editing command", error);
           }
         }
       );
@@ -355,9 +168,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error adding category: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error adding category", error);
           }
         }
       );
@@ -406,9 +217,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error renaming category: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error renaming category", error);
           }
         }
       );
@@ -455,9 +264,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error deleting category: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error deleting category", error);
           }
         }
       );
@@ -508,9 +315,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error moving command: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error moving command", error);
           }
         }
       );
@@ -544,9 +349,7 @@ export function activate(context: vscode.ExtensionContext) {
               );
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error adding command to category: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error adding command to category", error);
           }
         }
       );
@@ -555,7 +358,6 @@ export function activate(context: vscode.ExtensionContext) {
         "cursor-memo.exportCommands",
         async () => {
           try {
-            //
             const exportData = dataService.exportData();
 
             const tempFile = await vscode.workspace.openTextDocument({
@@ -569,9 +371,7 @@ export function activate(context: vscode.ExtensionContext) {
               "Commands exported. Press Ctrl+S (Cmd+S on macOS) to save the JSON file."
             );
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error exporting commands: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error exporting commands", error);
           }
         }
       );
@@ -603,9 +403,7 @@ export function activate(context: vscode.ExtensionContext) {
               );
             }
           } catch (error) {
-            vscode.window.showErrorMessage(
-              `Error importing commands: ${error instanceof Error ? error.message : String(error)}`
-            );
+            showError("Error importing commands", error);
           }
         }
       );
@@ -632,9 +430,7 @@ export function activate(context: vscode.ExtensionContext) {
       outputChannel.appendLine("Cursor Memo Plugin fully initialized");
     })
     .catch((error) => {
-      vscode.window.showErrorMessage(
-        `Failed to initialize Cursor Memo: ${error instanceof Error ? error.message : String(error)}`
-      );
+      showError("Failed to initialize Cursor Memo", error);
     });
 }
 
