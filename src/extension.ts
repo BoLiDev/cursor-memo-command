@@ -1,9 +1,20 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { MemoTreeDataProvider } from "./memoTreeDataProvider";
-import { MemoDataService } from "./memoDataService";
-import { createCommand, showError } from "./utils";
+
+// Import services
+import { LocalMemoService } from "./services/local-data-service";
+import { GitlabClient } from "./services/gitlab-service"; // Renamed to GitlabClient, handles cloud
+
+// Import view provider and required types
+import {
+  MemoTreeDataProvider,
+  CategoryGroupTreeItem,
+  CategoryTreeItem,
+} from "./view/tree-provider";
+import { MemoItem } from "./models/memo-item";
+
+// Import all command handlers from the commands index
 import {
   createSaveCommandHandler,
   createRemoveCommandHandler,
@@ -22,168 +33,140 @@ import {
   createRemoveCloudCategoryHandler,
 } from "./commands";
 
+// Tree Data Provider instance
+let memoTreeProvider: MemoTreeDataProvider;
+// Use the more specific type provided by the TreeDataProvider
+let memoTreeView: vscode.TreeView<
+  CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+>;
+
 /**
- * Extension activation function
- * Called by VSCode when the extension is activated
- * Initializes data service, tree view, and various commands
- * @param context VSCode extension context for registering commands and storing state
+ * Activate the extension
+ * @param context Extension context
  */
-export function activate(context: vscode.ExtensionContext) {
-  const outputChannel = vscode.window.createOutputChannel("Cursor Memo");
-  outputChannel.appendLine("Cursor Memo Plugin activated");
+export async function activate(context: vscode.ExtensionContext) {
+  console.log('"cursor-memo" is now active!');
 
-  const dataService = new MemoDataService(context);
-  dataService
-    .initialize()
-    .then(() => {
-      const memoTreeProvider = new MemoTreeDataProvider(dataService);
+  // --- Initialization ---
+  // Instantiate both services
+  const localMemoService = new LocalMemoService(context);
+  const gitlabService = new GitlabClient(context);
 
-      const saveCommandDisposable = createCommand(
-        "cursor-memo.saveCommand",
-        createSaveCommandHandler(dataService, memoTreeProvider),
-        "Error saving command"
-      );
+  // Initialize both services (they load their respective data)
+  await localMemoService.initialize();
+  await gitlabService.initialize(); // GitlabClient now needs initialization
 
-      const removeCommandDisposable = createCommand(
-        "cursor-memo.removeCommand",
-        createRemoveCommandHandler(dataService, memoTreeProvider),
-        "Error removing command"
-      );
+  // Instantiate TreeDataProvider with both services
+  memoTreeProvider = new MemoTreeDataProvider(localMemoService, gitlabService);
 
-      const renameCommandDisposable = createCommand(
-        "cursor-memo.renameCommand",
-        createRenameCommandHandler(dataService, memoTreeProvider),
-        "Error renaming command"
-      );
+  // Register Tree View
+  memoTreeView = vscode.window.createTreeView("cursorMemoPanel", {
+    treeDataProvider: memoTreeProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(memoTreeView);
 
-      const pasteToEditorDisposable = createCommand(
-        "cursor-memo.pasteToEditor",
-        createPasteToEditorHandler(),
-        "Error pasting command"
-      );
+  // Set the command to be executed when a memo item is clicked (no change needed)
+  memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
-      const editCommandDisposable = createCommand(
-        "cursor-memo.editCommand",
-        createEditCommandHandler(dataService, memoTreeProvider),
-        "Error editing command"
-      );
+  // --- Register Commands ---
+  // Pass the correct service instances to command handlers
+  const commands: { [key: string]: (...args: any[]) => Promise<void> } = {
+    // Local Commands (use localMemoService)
+    "cursor-memo.saveCommand": createSaveCommandHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.removeCommand": createRemoveCommandHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.renameCommand": createRenameCommandHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.pasteToEditor": createPasteToEditorHandler(), // No service needed
+    "cursor-memo.editCommand": createEditCommandHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
 
-      const addCategoryDisposable = createCommand(
-        "cursor-memo.addCategory",
-        createAddCategoryHandler(dataService, memoTreeProvider),
-        "Error adding category"
-      );
+    // Category Commands (use localMemoService for local categories)
+    "cursor-memo.addCategory": createAddCategoryHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.renameCategory": createRenameCategoryHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.deleteCategory": createDeleteCategoryHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.moveToCategory": createMoveToCategoryHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
+    "cursor-memo.addCommandToCategory": createAddCommandToCategoryHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
 
-      const renameCategoryDisposable = createCommand(
-        "cursor-memo.renameCategory",
-        createRenameCategoryHandler(dataService, memoTreeProvider),
-        "Error renaming category"
-      );
+    // Cloud/GitLab Commands (use gitlabService)
+    "cursor-memo.removeCloudCategory": createRemoveCloudCategoryHandler(
+      gitlabService, // Pass gitlabService now
+      memoTreeProvider
+    ),
+    "cursor-memo.syncFromGitLab": createSyncFromGitLabHandler(
+      gitlabService, // Pass gitlabService now
+      memoTreeProvider
+    ),
+    "cursor-memo.manageGitLabToken":
+      createManageGitLabTokenHandler(gitlabService), // Pass gitlabService now
 
-      const deleteCategoryDisposable = createCommand(
-        "cursor-memo.deleteCategory",
-        createDeleteCategoryHandler(dataService, memoTreeProvider),
-        "Error deleting category"
-      );
+    // Data Transfer Commands (use localMemoService for local data export/import)
+    "cursor-memo.exportCommands": createExportCommandsHandler(localMemoService),
+    "cursor-memo.importCommands": createImportCommandsHandler(
+      localMemoService,
+      memoTreeProvider
+    ),
 
-      const removeCloudCategoryDisposable = createCommand(
-        "cursor-memo.removeCloudCategory",
-        createRemoveCloudCategoryHandler(dataService, memoTreeProvider),
-        "Error removing cloud category"
-      );
+    // Refresh command
+    "cursor-memo.refresh": async () => {
+      // ViewModel update now handles both local and cloud refresh
+      memoTreeProvider.updateView();
+    },
+  };
 
-      const moveToCategory = createCommand(
-        "cursor-memo.moveToCategory",
-        createMoveToCategoryHandler(dataService, memoTreeProvider),
-        "Error moving command"
-      );
+  // Register all commands
+  for (const commandId in commands) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(commandId, commands[commandId])
+    );
+  }
 
-      const addCommandToCategory = createCommand(
-        "cursor-memo.addCommandToCategory",
-        createAddCommandToCategoryHandler(dataService, memoTreeProvider),
-        "Error adding command to category"
-      );
-
-      const exportCommands = createCommand(
-        "cursor-memo.exportCommands",
-        createExportCommandsHandler(dataService),
-        "Error exporting commands"
-      );
-
-      const importCommands = createCommand(
-        "cursor-memo.importCommands",
-        createImportCommandsHandler(dataService, memoTreeProvider),
-        "Error importing commands"
-      );
-
-      const syncFromGitLab = createCommand(
-        "cursor-memo.syncFromGitLab",
-        createSyncFromGitLabHandler(dataService, memoTreeProvider),
-        "Error syncing from GitLab"
-      );
-
-      const manageGitLabToken = createCommand(
-        "cursor-memo.manageGitLabToken",
-        createManageGitLabTokenHandler(dataService),
-        "Error managing GitLab token"
-      );
-
-      memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
-
-      const treeView = vscode.window.createTreeView("cursorMemoPanel", {
-        treeDataProvider: memoTreeProvider,
-        showCollapseAll: false,
-      });
-
-      // Add sync button to view title
-      treeView.onDidChangeVisibility((e) => {
-        if (e.visible) {
-          vscode.commands.executeCommand(
-            "setContext",
-            "cursor-memo.treeViewVisible",
-            true
-          );
-        } else {
-          vscode.commands.executeCommand(
-            "setContext",
-            "cursor-memo.treeViewVisible",
-            false
-          );
-        }
-      });
-
-      context.subscriptions.push(
-        saveCommandDisposable,
-        removeCommandDisposable,
-        renameCommandDisposable,
-        pasteToEditorDisposable,
-        editCommandDisposable,
-        addCategoryDisposable,
-        renameCategoryDisposable,
-        deleteCategoryDisposable,
-        removeCloudCategoryDisposable,
-        moveToCategory,
-        addCommandToCategory,
-        exportCommands,
-        importCommands,
-        syncFromGitLab,
-        manageGitLabToken,
-        treeView,
-        outputChannel
-      );
-
-      outputChannel.appendLine("Cursor Memo Plugin fully initialized");
+  // --- Watch for configuration changes (e.g., GitLab settings) ---
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("cursorMemo.gitlab")) {
+        // Optionally trigger a refresh or notify user if GitLab config changes
+        vscode.window.showInformationMessage(
+          "GitLab configuration changed. You may need to sync again."
+        );
+        // Trigger refresh to potentially update GitLabClient state if needed by TreeView
+        memoTreeProvider.updateView();
+      }
     })
-    .catch((error) => {
-      showError("Failed to initialize Cursor Memo", error);
-    });
+  );
+
+  // Initial refresh to load data into the view
+  memoTreeProvider.updateView();
 }
 
 /**
- * Extension deactivation function
- * Called by VSCode when the extension is deactivated
- * Used to clean up resources and display deactivation message
+ * Deactivate the extension
  */
 export function deactivate() {
-  vscode.window.showInformationMessage("Cursor Memo Plugin deactivated");
+  console.log('"cursor-memo" is now deactivated!');
 }
