@@ -1,75 +1,138 @@
 <!-- @format -->
 
-# Cursor Memo Plugin
+# GitLab文件访问模块
 
-A plugin for saving and reusing Cursor chat commands.
+一个简单、高效的GitLab API客户端，用于获取项目中的文件和目录内容。
 
-## Features
+## 特性
 
-- Save frequently used Cursor chat commands
-- Display command list in the sidebar
-- Click on a command to directly copy and paste it into Cursor Chatbox
-- Right-click menu options for managing commands:
-  - Rename commands (set custom aliases for better readability)
-  - Delete commands
-  - Move commands between categories
-- Import and export commands:
-  - Export all your commands and categories to a JSON file
-  - Import commands and categories from a JSON file
-  - Automatic deduplication during import
+- 获取GitLab项目中的文件内容
+- 获取GitLab项目中的目录内容
+- 自动获取项目的默认分支
+- 类型安全（使用Zod进行运行时类型验证）
 
-## Usage
-
-1. Open Cursor editor
-2. Execute the `Cursor Memo: Save Current Command` command via the command palette (Ctrl+Shift+P or Cmd+Shift+P)
-3. Enter or paste the command you want to save (input box will show clipboard content by default)
-4. View saved commands in the "Command Memo" view in the sidebar
-5. **Single-click** on a command to:
-   - Automatically copy it into Cursor Chatbox
-6. **Right-click** on a command to access additional options:
-   - Rename (set a custom alias/display name)
-   - Delete
-
-### Import and Export
-
-1. To export your commands, click the export icon in the Command Memo view title bar
-   - Select which categories you want to export (leave empty to export all categories)
-   - A file save dialog will open allowing you to choose where to save the JSON file
-   - Choose a location and filename, then click "Export"
-2. To import commands, click the import icon in the Command Memo view title bar
-   - A file open dialog will appear - select a previously exported JSON file
-   - Commands and categories will be imported with automatic deduplication
-
-## Development
-
-### Setup
+## 安装
 
 ```bash
-# Install dependencies
-npm install
-
-# Compile
-npm run compile
-
-# Watch mode
-npm run watch
+npm install node-fetch zod @types/node-fetch
 ```
 
-### Testing the Extension
+## 使用示例
 
-Press F5 to start a debugging session, which will open a new VS Code window with the extension loaded.
+### 获取文件内容
 
-### Packaging the Extension
+```typescript
+import { getFileContent } from "./gitlab";
 
-```bash
-# Install vsce tool
-npm install -g vsce
+// 设置环境变量
+process.env.GITLAB_PERSONAL_ACCESS_TOKEN = "your_token_here";
+process.env.GITLAB_API_URL = "https://gitlab.com/api/v4"; // 可选，默认使用gitlab.com
 
-# Package the extension
-npm run package
+// 获取文件内容
+const projectId = "namespace/project";
+const filePath = "path/to/file.js";
+const branch = "main"; // 可选，如果不提供则使用项目默认分支
+
+try {
+  const content = await getFileContent(projectId, filePath, branch);
+
+  // 如果返回的是文件
+  if (!Array.isArray(content)) {
+    console.log(`文件名: ${content.file_name}`);
+    console.log(`大小: ${content.size} 字节`);
+
+    // 解码Base64内容
+    const decodedContent = Buffer.from(content.content, "base64").toString(
+      "utf-8"
+    );
+    console.log(`内容: ${decodedContent}`);
+  }
+} catch (error) {
+  console.error("获取文件失败:", error);
+}
 ```
 
-Once packaged, the extension will be located in root directory, right click on the extension file and select `Install Extension VSIX` to install it.
+### 获取目录内容
+
+```typescript
+import { getFileContent } from "./gitlab";
+
+// 设置环境变量
+process.env.GITLAB_PERSONAL_ACCESS_TOKEN = "your_token_here";
+
+// 获取目录内容
+const projectId = "namespace/project";
+const directoryPath = "path/to/directory";
+
+try {
+  const content = await getFileContent(projectId, directoryPath);
+
+  // 如果返回的是目录
+  if (Array.isArray(content)) {
+    console.log("目录内容:");
+    content.forEach((item) => {
+      console.log(`- ${item.name} (${item.type}): ${item.path}`);
+    });
+  }
+} catch (error) {
+  console.error("获取目录失败:", error);
+}
+```
+
+## API
+
+### getFileContent(projectId, filePath, ref?)
+
+获取GitLab项目中的文件或目录内容。
+
+**参数:**
+
+- `projectId` (string): 项目ID或URL编码的路径（例如 'namespace/project'）
+- `filePath` (string): 要获取内容的文件或目录路径
+- `ref` (string, 可选): 分支、标签或提交的引用，默认为项目的默认分支
+
+**返回值:**
+
+返回一个Promise，解析为文件内容或目录内容列表。
+
+## 环境变量
+
+- `GITLAB_PERSONAL_ACCESS_TOKEN`: 必需。GitLab个人访问令牌，用于API认证。
+- `GITLAB_API_URL`: 可选。GitLab API URL，默认为 'https://gitlab.com/api/v4'。
+
+## 类型
+
+模块包含以下主要类型定义：
+
+```typescript
+// 文件内容
+type GitLabFileContent = {
+  file_name: string;
+  file_path: string;
+  size: number;
+  encoding: string;
+  content: string; // Base64编码
+  content_sha256: string;
+  ref: string;
+  blob_id: string;
+  commit_id: string;
+  last_commit_id: string;
+  execute_filemode?: boolean;
+};
+
+// 目录项
+type GitLabDirectoryContent = {
+  name: string;
+  path: string;
+  type: string;
+  mode: string;
+  id: string;
+  web_url: string;
+};
+
+// 统一内容类型
+type GitLabContent = GitLabFileContent | GitLabDirectoryContent[];
+```
 
 ## License
 

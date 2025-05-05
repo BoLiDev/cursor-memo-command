@@ -474,3 +474,98 @@ export function createImportCommandsHandler(
     }
   };
 }
+
+/**
+ * Creates the sync from GitLab handler
+ * @param dataService The memo data service
+ * @param memoTreeProvider The memo tree data provider
+ * @returns The sync from GitLab handler function
+ */
+export function createSyncFromGitLabHandler(
+  dataService: MemoDataService,
+  memoTreeProvider: MemoTreeDataProvider
+): (...args: any[]) => Promise<void> {
+  return async () => {
+    try {
+      vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Syncing team commands from GitLab...",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({ increment: 20 });
+
+          const result = await dataService.syncFromGitLab();
+
+          progress.report({ increment: 80 });
+
+          if (result.success) {
+            memoTreeProvider.updateView();
+            vscode.window.showInformationMessage(
+              `Successfully synced ${result.syncedCommands} team commands from GitLab`
+            );
+          } else {
+            const action = await vscode.window.showErrorMessage(
+              "Failed to sync team commands from GitLab. Token might be invalid.",
+              "Reset Token"
+            );
+
+            if (action === "Reset Token") {
+              await dataService.clearGitLabToken();
+              vscode.window.showInformationMessage(
+                "GitLab token has been cleared. Please try syncing again."
+              );
+            }
+          }
+        }
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const action = await vscode.window.showErrorMessage(
+        `Error syncing from GitLab: ${errorMessage}`,
+        "Reset Token"
+      );
+
+      if (action === "Reset Token") {
+        await dataService.clearGitLabToken();
+        vscode.window.showInformationMessage(
+          "GitLab token has been cleared. Please try syncing again."
+        );
+      }
+    }
+  };
+}
+
+/**
+ * Creates the manage GitLab token handler
+ * @param dataService The memo data service
+ * @returns The manage GitLab token handler function
+ */
+export function createManageGitLabTokenHandler(
+  dataService: MemoDataService
+): (...args: any[]) => Promise<void> {
+  return async () => {
+    const action = await vscode.window.showQuickPick(
+      [
+        {
+          label: "Reset GitLab Token",
+          description: "Clear stored token and request a new one",
+        },
+        { label: "Cancel", description: "Do nothing" },
+      ],
+      {
+        placeHolder: "Choose an action for GitLab token",
+        title: "Manage GitLab Token",
+      }
+    );
+
+    if (action && action.label === "Reset GitLab Token") {
+      await dataService.clearGitLabToken();
+      vscode.window.showInformationMessage(
+        "GitLab token has been cleared. You will be prompted for a new token on next sync."
+      );
+    }
+  };
+}

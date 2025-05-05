@@ -17,6 +17,8 @@ import {
   createAddCommandToCategoryHandler,
   createExportCommandsHandler,
   createImportCommandsHandler,
+  createSyncFromGitLabHandler,
+  createManageGitLabTokenHandler,
 } from "./commands";
 
 /**
@@ -107,11 +109,40 @@ export function activate(context: vscode.ExtensionContext) {
         "Error importing commands"
       );
 
+      const syncFromGitLab = createCommand(
+        "cursor-memo.syncFromGitLab",
+        createSyncFromGitLabHandler(dataService, memoTreeProvider),
+        "Error syncing from GitLab"
+      );
+
+      const manageGitLabToken = createCommand(
+        "cursor-memo.manageGitLabToken",
+        createManageGitLabTokenHandler(dataService),
+        "Error managing GitLab token"
+      );
+
       memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
       const treeView = vscode.window.createTreeView("cursorMemoPanel", {
         treeDataProvider: memoTreeProvider,
         showCollapseAll: false,
+      });
+
+      // Add sync button to view title
+      treeView.onDidChangeVisibility((e) => {
+        if (e.visible) {
+          vscode.commands.executeCommand(
+            "setContext",
+            "cursor-memo.treeViewVisible",
+            true
+          );
+        } else {
+          vscode.commands.executeCommand(
+            "setContext",
+            "cursor-memo.treeViewVisible",
+            false
+          );
+        }
       });
 
       context.subscriptions.push(
@@ -127,6 +158,8 @@ export function activate(context: vscode.ExtensionContext) {
         addCommandToCategory,
         exportCommands,
         importCommands,
+        syncFromGitLab,
+        manageGitLabToken,
         treeView,
         outputChannel
       );

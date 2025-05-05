@@ -2,7 +2,7 @@
   "name": "cursor-memo-plugin",
   "displayName": "Cursor Memo Plugin",
   "description": "Plugin to save and reuse Cursor chat commands",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/BoLiDev/cursor-memo-command.git"
@@ -83,6 +83,17 @@
         "title": "Import Commands",
         "category": "Cursor Memo",
         "icon": "$(arrow-down)"
+      },
+      {
+        "command": "cursor-memo.syncFromGitLab",
+        "title": "Sync Team Commands from GitLab",
+        "category": "Cursor Memo",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "cursor-memo.manageGitLabToken",
+        "title": "Manage GitLab Token",
+        "category": "Cursor Memo"
       }
     ],
     "views": {
@@ -155,8 +166,44 @@
           "when": "view == cursorMemoPanel",
           "group": "navigation",
           "icon": "$(arrow-down)"
+        },
+        {
+          "command": "cursor-memo.syncFromGitLab",
+          "when": "view == cursorMemoPanel",
+          "group": "navigation",
+          "icon": "$(cloud-download)"
+        },
+        {
+          "command": "cursor-memo.manageGitLabToken",
+          "when": "view == cursorMemoPanel",
+          "group": "9_sync@1"
         }
       ]
+    },
+    "configuration": {
+      "title": "Cursor Memo",
+      "properties": {
+        "cursorMemo.gitlabDomain": {
+          "type": "string",
+          "default": "https://gitlab.okg.com",
+          "description": "GitLab domain URL"
+        },
+        "cursorMemo.gitlabProjectId": {
+          "type": "string",
+          "default": "9993",
+          "description": "GitLab project ID for team commands"
+        },
+        "cursorMemo.gitlabFilePath": {
+          "type": "string",
+          "default": "prompt.json",
+          "description": "Path to the team commands file in the GitLab repository"
+        },
+        "cursorMemo.gitlabBranch": {
+          "type": "string",
+          "default": "master",
+          "description": "GitLab branch name containing the team commands file"
+        }
+      }
     }
   },
   "scripts": {
@@ -170,7 +217,7 @@
   },
   "devDependencies": {
     "@types/glob": "^7.1.3",
-    "@types/node": "^12.11.7",
+    "@types/node": "^12.20.55",
     "@types/vscode": "^1.60.0",
     "@typescript-eslint/eslint-plugin": "^4.14.1",
     "@typescript-eslint/parser": "^4.14.1",
@@ -179,5 +226,10 @@
     "prettier": "^3.5.3",
     "typescript": "^4.1.3",
     "vscode-test": "^1.5.0"
+  },
+  "dependencies": {
+    "@types/node-fetch": "^2.6.2",
+    "node-fetch": "^2.6.7",
+    "zod": "^3.24.4"
   }
 }

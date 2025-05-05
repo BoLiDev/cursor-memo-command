@@ -9,11 +9,12 @@ import { MemoItem, MemoDataService } from "./memoDataService";
 export class CategoryTreeItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly isCloud: boolean = false
   ) {
     super(label, collapsibleState);
-    this.contextValue = "category";
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.contextValue = isCloud ? "cloudCategory" : "category";
+    this.iconPath = new vscode.ThemeIcon(isCloud ? "cloud" : "folder");
   }
 }
 
@@ -35,7 +36,9 @@ export class MemoTreeDataProvider
 
   private commandCallback: string | undefined;
   private categories: Map<string, MemoItem[]> = new Map();
+  private cloudCategories: Map<string, MemoItem[]> = new Map();
   private categoryNodes: Map<string, CategoryTreeItem> = new Map();
+  private cloudCategoryNodes: Map<string, CategoryTreeItem> = new Map();
 
   /**
    * Constructor
@@ -62,10 +65,14 @@ export class MemoTreeDataProvider
   private updateCategoriesMap(): void {
     this.categories.clear();
     this.categoryNodes.clear();
+    this.cloudCategories.clear();
+    this.cloudCategoryNodes.clear();
 
     const allCategories = this.dataService.getCategories();
     const allCommands = this.dataService.getCommands();
+    const allCloudCommands = this.dataService.getCloudCommands();
 
+    // Setup local categories
     allCategories.forEach((category) => {
       if (!this.categories.has(category)) {
         this.categories.set(category, []);
@@ -80,6 +87,7 @@ export class MemoTreeDataProvider
       }
     });
 
+    // Organize local commands by category
     allCommands.forEach((item) => {
       const category = item.category || this.dataService.getDefaultCategory();
       if (!this.categories.has(category)) {
@@ -96,8 +104,39 @@ export class MemoTreeDataProvider
       this.categories.get(category)?.push(item);
     });
 
+    // Setup cloud categories and organize cloud commands
+    const cloudCategoriesSet = new Set<string>();
+
+    allCloudCommands.forEach((item) => {
+      const category = item.category || this.dataService.getDefaultCategory();
+      cloudCategoriesSet.add(category);
+
+      if (!this.cloudCategories.has(category)) {
+        this.cloudCategories.set(category, []);
+
+        this.cloudCategoryNodes.set(
+          category,
+          new CategoryTreeItem(
+            category,
+            vscode.TreeItemCollapsibleState.Expanded,
+            true // isCloud
+          )
+        );
+      }
+
+      this.cloudCategories.get(category)?.push(item);
+    });
+
+    // Sort commands by timestamp in each category
     for (const [category, items] of this.categories.entries()) {
       this.categories.set(
+        category,
+        items.sort((a, b) => b.timestamp - a.timestamp)
+      );
+    }
+
+    for (const [category, items] of this.cloudCategories.entries()) {
+      this.cloudCategories.set(
         category,
         items.sort((a, b) => b.timestamp - a.timestamp)
       );
@@ -131,9 +170,11 @@ export class MemoTreeDataProvider
     );
 
     treeItem.description = new Date(element.timestamp).toLocaleString();
-    treeItem.iconPath = new vscode.ThemeIcon("note");
+    treeItem.iconPath = new vscode.ThemeIcon(
+      element.isCloud ? "cloud" : "note"
+    );
     treeItem.tooltip = element.command;
-    treeItem.contextValue = "memoItem";
+    treeItem.contextValue = element.isCloud ? "cloudMemoItem" : "memoItem";
 
     if (this.commandCallback) {
       treeItem.command = {
@@ -156,8 +197,11 @@ export class MemoTreeDataProvider
     element?: CategoryTreeItem | MemoItem
   ): (CategoryTreeItem | MemoItem)[] {
     if (!element) {
+      // Return both local and cloud categories at the root level
       const defaultCategory = this.dataService.getDefaultCategory();
-      const sortedCategories = Array.from(this.categories.keys()).sort(
+
+      // Get all local categories and sort them
+      const sortedLocalCategories = Array.from(this.categories.keys()).sort(
         (a, b) => {
           if (a === defaultCategory) return 1;
           if (b === defaultCategory) return -1;
@@ -165,13 +209,30 @@ export class MemoTreeDataProvider
         }
       );
 
-      return sortedCategories.map(
+      // Get all cloud categories and sort them
+      const sortedCloudCategories = Array.from(
+        this.cloudCategories.keys()
+      ).sort((a, b) => a.localeCompare(b));
+
+      // Combine local and cloud categories, with cloud categories first
+      const localCategoryNodes = sortedLocalCategories.map(
         (category) => this.categoryNodes.get(category)!
       );
+
+      const cloudCategoryNodes = sortedCloudCategories.map(
+        (category) => this.cloudCategoryNodes.get(category)!
+      );
+
+      return [...cloudCategoryNodes, ...localCategoryNodes];
     }
 
     if (element instanceof CategoryTreeItem) {
-      return this.categories.get(element.label) || [];
+      // Return items from the appropriate category (local or cloud)
+      if (element.isCloud) {
+        return this.cloudCategories.get(element.label) || [];
+      } else {
+        return this.categories.get(element.label) || [];
+      }
     }
 
     return [];
@@ -189,7 +250,12 @@ export class MemoTreeDataProvider
     if (!(element instanceof CategoryTreeItem)) {
       const categoryName =
         element.category || this.dataService.getDefaultCategory();
-      return this.categoryNodes.get(categoryName);
+
+      if (element.isCloud) {
+        return this.cloudCategoryNodes.get(categoryName);
+      } else {
+        return this.categoryNodes.get(categoryName);
+      }
     }
 
     return null;

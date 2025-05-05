@@ -1,6 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
+import { GitlabClient } from "./gitlab";
 
 /**
  * Data structure for memo items
@@ -12,6 +13,7 @@ export interface MemoItem {
   timestamp: number;
   alias?: string;
   category: string;
+  isCloud?: boolean;
 }
 
 /**
@@ -20,17 +22,22 @@ export interface MemoItem {
 export class MemoDataService {
   private static STORAGE_KEY = "cursor-memo-commands";
   private static CATEGORIES_KEY = "cursor-memo-categories";
+  private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "default";
 
   private commands: MemoItem[] = [];
+  private cloudCommands: MemoItem[] = [];
   private categories: string[] = [];
   private initialized: boolean = false;
+  private gitlabClient: GitlabClient;
 
   /**
    * Constructor
    * @param context VSCode extension context for accessing global state storage
    */
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {
+    this.gitlabClient = new GitlabClient(context);
+  }
 
   /**
    * Initialize the data service
@@ -59,6 +66,11 @@ export class MemoDataService {
       await this.saveCommands();
     }
 
+    this.cloudCommands = this.context.globalState.get<MemoItem[]>(
+      MemoDataService.CLOUD_COMMANDS_KEY,
+      []
+    );
+
     this.categories = this.context.globalState.get<string[]>(
       MemoDataService.CATEGORIES_KEY,
       []
@@ -79,6 +91,15 @@ export class MemoDataService {
    */
   public getCommands(): MemoItem[] {
     return [...this.commands];
+  }
+
+  /**
+   * Get all cloud commands
+   * Returns a copy of the cloud commands array
+   * @returns Array of all cloud commands
+   */
+  public getCloudCommands(): MemoItem[] {
+    return [...this.cloudCommands];
   }
 
   /**
@@ -262,12 +283,13 @@ export class MemoDataService {
       return false;
     }
 
-    const index = this.categories.indexOf(oldName);
-    if (index === -1) {
+    if (!this.categories.includes(oldName)) {
       return false;
     }
 
-    this.categories[index] = newName;
+    this.categories = this.categories.map((cat) =>
+      cat === oldName ? newName : cat
+    );
 
     this.commands = this.commands.map((cmd) => {
       if (cmd.category === oldName) {
@@ -281,9 +303,9 @@ export class MemoDataService {
   }
 
   /**
-   * Move a command to a specific category
+   * Move a command to a different category
    * @param commandId The ID of the command to move
-   * @param targetCategory The target category
+   * @param targetCategory The category to move the command to
    * @returns Promise<boolean> Whether the operation was successful
    */
   public async moveCommandToCategory(
@@ -295,6 +317,7 @@ export class MemoDataService {
     }
 
     let updated = false;
+
     this.commands = this.commands.map((cmd) => {
       if (cmd.id === commandId) {
         updated = true;
@@ -311,40 +334,36 @@ export class MemoDataService {
   }
 
   /**
-   * Export commands and categories data as a JSON string
-   * @returns JSON string containing all commands and categories data
+   * Export all data as JSON string
+   * @returns JSON string of all commands and categories
    */
   public exportData(): string {
-    const exportData = {
+    return JSON.stringify({
       commands: this.commands,
       categories: this.categories,
-    };
-    return JSON.stringify(exportData, null, 2);
+    });
   }
 
   /**
-   * Export selected categories and their commands data as a JSON string
+   * Export selected categories as JSON string
    * @param selectedCategories Array of category names to export
-   * @returns JSON string containing selected commands and categories data
+   * @returns JSON string of selected categories and their commands
    */
   public exportSelectedCategories(selectedCategories: string[]): string {
-    // Filter commands that belong to selected categories
     const filteredCommands = this.commands.filter((cmd) =>
       selectedCategories.includes(cmd.category)
     );
 
-    const exportData = {
+    return JSON.stringify({
       commands: filteredCommands,
       categories: selectedCategories,
-    };
-    return JSON.stringify(exportData, null, 2);
+    });
   }
 
   /**
-   * Import commands and categories data from a JSON string
-   * Handles duplicates: keeps existing categories if names conflict, ignores imported commands if content already exists
-   * @param jsonData JSON string containing commands and categories data
-   * @returns Result of the import operation: success status and counts of imported commands and categories
+   * Import data from JSON string
+   * @param jsonData JSON string of commands and categories
+   * @returns Promise with result of import operation
    */
   public async importData(jsonData: string): Promise<{
     success: boolean;
@@ -353,81 +372,134 @@ export class MemoDataService {
   }> {
     try {
       const data = JSON.parse(jsonData);
+      const importedCommands: MemoItem[] = data.commands || [];
+      const importedCategories: string[] = data.categories || [];
 
-      if (
-        !data.commands ||
-        !Array.isArray(data.commands) ||
-        !data.categories ||
-        !Array.isArray(data.categories)
-      ) {
-        return { success: false, importedCommands: 0, importedCategories: 0 };
-      }
-
-      let importedCategories = 0;
-      for (const category of data.categories) {
-        if (
-          typeof category === "string" &&
-          !this.categories.includes(category) &&
-          category !== MemoDataService.DEFAULT_CATEGORY
-        ) {
-          this.categories.push(category);
-          importedCategories++;
-        }
-      }
-
-      let importedCommands = 0;
-      const existingCommandContents = new Set(
-        this.commands.map((cmd) => cmd.command)
+      // Validate imported data
+      const validCommands = importedCommands.filter(
+        (cmd) =>
+          typeof cmd === "object" &&
+          cmd !== null &&
+          typeof cmd.command === "string" &&
+          typeof cmd.id === "string"
       );
 
-      for (const cmd of data.commands) {
-        if (!cmd.id || !cmd.command || !cmd.label || !cmd.timestamp) {
-          continue;
-        }
+      // Process categories
+      const newCategories = importedCategories.filter(
+        (cat) =>
+          typeof cat === "string" &&
+          cat.trim() !== "" &&
+          !this.categories.includes(cat)
+      );
 
-        if (!existingCommandContents.has(cmd.command)) {
-          const category =
-            cmd.category && this.categories.includes(cmd.category)
-              ? cmd.category
-              : MemoDataService.DEFAULT_CATEGORY;
-
-          const newCmd: MemoItem = {
-            id:
-              Date.now().toString() + Math.random().toString().substring(2, 8),
-            label: cmd.label,
-            command: cmd.command,
-            timestamp: cmd.timestamp,
-            alias: cmd.alias,
-            category: category,
-          };
-
-          this.commands.push(newCmd);
-          existingCommandContents.add(cmd.command);
-          importedCommands++;
-        }
-      }
-
-      if (importedCategories > 0) {
+      if (newCategories.length > 0) {
+        this.categories = [...this.categories, ...newCategories];
         await this.saveCategories();
       }
 
-      if (importedCommands > 0) {
+      // Process commands with proper IDs
+      const now = Date.now();
+      const processedCommands = validCommands.map((cmd) => {
+        const label =
+          cmd.label ||
+          (cmd.command.length > 30
+            ? `${cmd.command.slice(0, 30)}...`
+            : cmd.command);
+
+        return {
+          ...cmd,
+          id: `${cmd.id}_imported_${now}`,
+          label: label,
+          timestamp: cmd.timestamp || now,
+          category: this.categories.includes(cmd.category)
+            ? cmd.category
+            : MemoDataService.DEFAULT_CATEGORY,
+        };
+      });
+
+      if (processedCommands.length > 0) {
+        this.commands = [...this.commands, ...processedCommands];
         await this.saveCommands();
       }
 
       return {
         success: true,
-        importedCommands,
-        importedCategories,
+        importedCommands: processedCommands.length,
+        importedCategories: newCategories.length,
       };
     } catch (error) {
-      console.error("Import data error:", error);
-      return { success: false, importedCommands: 0, importedCategories: 0 };
+      console.error("Import error:", error);
+      return {
+        success: false,
+        importedCommands: 0,
+        importedCategories: 0,
+      };
     }
   }
 
   /**
-   * Save commands to storage
+   * Synchronize commands from GitLab
+   * Fetches commands from a specified GitLab repository and updates cloud commands
+   * @returns Promise with synchronization result
+   */
+  public async syncFromGitLab(): Promise<{
+    success: boolean;
+    syncedCommands: number;
+  }> {
+    try {
+      const result = await this.gitlabClient.fetchTeamCommands();
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to fetch data from GitLab");
+      }
+
+      const importedCommands: MemoItem[] = result.data.commands || [];
+
+      // Process commands and mark them as cloud commands
+      const now = Date.now();
+      this.cloudCommands = importedCommands.map((cmd) => {
+        const label =
+          cmd.label ||
+          (cmd.command.length > 30
+            ? `${cmd.command.slice(0, 30)}...`
+            : cmd.command);
+
+        return {
+          ...cmd,
+          id: `cloud_${cmd.id || now.toString()}`,
+          label: label,
+          timestamp: cmd.timestamp || now,
+          category: cmd.category || MemoDataService.DEFAULT_CATEGORY,
+          isCloud: true,
+        };
+      });
+
+      await this.saveCloudCommands();
+
+      return {
+        success: true,
+        syncedCommands: this.cloudCommands.length,
+      };
+    } catch (error) {
+      console.error("GitLab sync error:", error);
+      return {
+        success: false,
+        syncedCommands: 0,
+      };
+    }
+  }
+
+  /**
+   * Clear stored GitLab token
+   * This can be called when token becomes invalid
+   */
+  public async clearGitLabToken(): Promise<void> {
+    await this.gitlabClient.clearToken();
+  }
+
+  /**
+   * Save commands to global state
+   * @returns Promise that resolves when commands have been saved
    */
   private async saveCommands(): Promise<void> {
     await this.context.globalState.update(
@@ -437,7 +509,19 @@ export class MemoDataService {
   }
 
   /**
-   * Save categories to storage
+   * Save cloud commands to global state
+   * @returns Promise that resolves when cloud commands have been saved
+   */
+  private async saveCloudCommands(): Promise<void> {
+    await this.context.globalState.update(
+      MemoDataService.CLOUD_COMMANDS_KEY,
+      this.cloudCommands
+    );
+  }
+
+  /**
+   * Save categories to global state
+   * @returns Promise that resolves when categories have been saved
    */
   private async saveCategories(): Promise<void> {
     await this.context.globalState.update(
