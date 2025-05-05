@@ -438,6 +438,97 @@ export class MemoDataService {
   }
 
   /**
+   * Import selected categories from JSON string
+   * @param jsonData JSON string of commands and categories
+   * @param selectedCategories Array of category names to import
+   * @returns Promise with result of import operation
+   */
+  public async importSelectedData(
+    jsonData: string,
+    selectedCategories: string[]
+  ): Promise<{
+    success: boolean;
+    importedCommands: number;
+    importedCategories: number;
+  }> {
+    try {
+      const data = JSON.parse(jsonData);
+      const allImportedCommands: MemoItem[] = data.commands || [];
+      const allImportedCategories: string[] = data.categories || [];
+
+      // Filter commands by selected categories
+      const importedCommands = allImportedCommands.filter((cmd) =>
+        selectedCategories.includes(cmd.category)
+      );
+
+      // Filter categories to only include selected ones
+      const importedCategories = allImportedCategories.filter((cat) =>
+        selectedCategories.includes(cat)
+      );
+
+      // Validate imported data
+      const validCommands = importedCommands.filter(
+        (cmd) =>
+          typeof cmd === "object" &&
+          cmd !== null &&
+          typeof cmd.command === "string" &&
+          typeof cmd.id === "string"
+      );
+
+      // Process categories
+      const newCategories = importedCategories.filter(
+        (cat) =>
+          typeof cat === "string" &&
+          cat.trim() !== "" &&
+          !this.categories.includes(cat)
+      );
+
+      if (newCategories.length > 0) {
+        this.categories = [...this.categories, ...newCategories];
+        await this.saveCategories();
+      }
+
+      // Process commands with proper IDs
+      const now = Date.now();
+      const processedCommands = validCommands.map((cmd) => {
+        const label =
+          cmd.label ||
+          (cmd.command.length > 30
+            ? `${cmd.command.slice(0, 30)}...`
+            : cmd.command);
+
+        return {
+          ...cmd,
+          id: `${cmd.id}_imported_${now}`,
+          label: label,
+          timestamp: cmd.timestamp || now,
+          category: this.categories.includes(cmd.category)
+            ? cmd.category
+            : MemoDataService.DEFAULT_CATEGORY,
+        };
+      });
+
+      if (processedCommands.length > 0) {
+        this.commands = [...this.commands, ...processedCommands];
+        await this.saveCommands();
+      }
+
+      return {
+        success: true,
+        importedCommands: processedCommands.length,
+        importedCategories: newCategories.length,
+      };
+    } catch (error) {
+      console.error("Import error:", error);
+      return {
+        success: false,
+        importedCommands: 0,
+        importedCategories: 0,
+      };
+    }
+  }
+
+  /**
    * Synchronize commands from GitLab
    * Fetches commands from a specified GitLab repository and updates cloud commands
    * @returns Promise with synchronization result
@@ -454,6 +545,66 @@ export class MemoDataService {
       }
 
       const importedCommands: MemoItem[] = result.data.commands || [];
+
+      // Process commands and mark them as cloud commands
+      const now = Date.now();
+      this.cloudCommands = importedCommands.map((cmd) => {
+        const label =
+          cmd.label ||
+          (cmd.command.length > 30
+            ? `${cmd.command.slice(0, 30)}...`
+            : cmd.command);
+
+        return {
+          ...cmd,
+          id: `cloud_${cmd.id || now.toString()}`,
+          label: label,
+          timestamp: cmd.timestamp || now,
+          category: cmd.category || MemoDataService.DEFAULT_CATEGORY,
+          isCloud: true,
+        };
+      });
+
+      await this.saveCloudCommands();
+
+      return {
+        success: true,
+        syncedCommands: this.cloudCommands.length,
+      };
+    } catch (error) {
+      console.error("GitLab sync error:", error);
+      return {
+        success: false,
+        syncedCommands: 0,
+      };
+    }
+  }
+
+  /**
+   * Synchronize selected categories from GitLab
+   * Fetches commands from a specified GitLab repository and updates cloud commands
+   * @param selectedCategories Array of category names to sync
+   * @returns Promise with synchronization result
+   */
+  public async syncSelectedFromGitLab(selectedCategories: string[]): Promise<{
+    success: boolean;
+    syncedCommands: number;
+  }> {
+    try {
+      const result = await this.gitlabClient.fetchTeamCommands();
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to fetch data from GitLab");
+      }
+
+      const allImportedCommands: MemoItem[] = result.data.commands || [];
+
+      // Filter commands by selected categories
+      const importedCommands = allImportedCommands.filter((cmd) =>
+        selectedCategories.includes(
+          cmd.category || MemoDataService.DEFAULT_CATEGORY
+        )
+      );
 
       // Process commands and mark them as cloud commands
       const now = Date.now();

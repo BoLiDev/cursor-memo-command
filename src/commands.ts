@@ -455,7 +455,69 @@ export function createImportCommandsHandler(
       const fileData = await vscode.workspace.fs.readFile(uris[0]);
       const jsonData = Buffer.from(fileData).toString("utf-8");
 
-      const result = await dataService.importData(jsonData);
+      // Parse JSON to get available categories
+      let parsedData: any;
+      try {
+        parsedData = JSON.parse(jsonData);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          "Failed to parse JSON file. Please ensure the file is valid JSON."
+        );
+        return;
+      }
+
+      // Extract categories and commands
+      const availableCategories = parsedData.categories || [];
+      const importCommands = parsedData.commands || [];
+
+      // Create a set of categories that have commands
+      const categoriesWithCommands = new Set<string>();
+      importCommands.forEach((cmd: any) => {
+        if (cmd.category) {
+          categoriesWithCommands.add(cmd.category);
+        }
+      });
+
+      // If no categories found
+      if (
+        availableCategories.length === 0 &&
+        categoriesWithCommands.size === 0
+      ) {
+        vscode.window.showErrorMessage("No categories found in import file.");
+        return;
+      }
+
+      // Combine categories from both sources
+      const allCategoriesSet = new Set([
+        ...availableCategories,
+        ...categoriesWithCommands,
+      ]);
+      const allCategories = Array.from(allCategoriesSet);
+
+      // Let user select categories to import
+      const selectedCategories = await vscode.window.showQuickPick(
+        allCategories.map((category) => ({ label: category })),
+        {
+          canPickMany: true,
+          placeHolder: "Select categories to import",
+          title: "Import Categories",
+        }
+      );
+
+      if (!selectedCategories || selectedCategories.length === 0) {
+        vscode.window.showInformationMessage(
+          "No categories selected for import."
+        );
+        return;
+      }
+
+      const categoriesToImport = selectedCategories.map((item) => item.label);
+
+      // Import selected categories
+      const result = await dataService.importSelectedData(
+        jsonData,
+        categoriesToImport
+      );
 
       if (result.success) {
         memoTreeProvider.updateView();
@@ -490,20 +552,82 @@ export function createSyncFromGitLabHandler(
       vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: "Syncing team commands from GitLab...",
+          title: "Fetching team commands from GitLab...",
           cancellable: false,
         },
         async (progress) => {
           progress.report({ increment: 20 });
 
-          const result = await dataService.syncFromGitLab();
+          // First fetch all data to show available categories
+          const prelimResult = await dataService.syncFromGitLab();
 
-          progress.report({ increment: 80 });
+          if (!prelimResult.success) {
+            const action = await vscode.window.showErrorMessage(
+              "Failed to fetch team commands from GitLab. Token might be invalid.",
+              "Reset Token"
+            );
+
+            if (action === "Reset Token") {
+              await dataService.clearGitLabToken();
+              vscode.window.showInformationMessage(
+                "GitLab token has been cleared. Please try syncing again."
+              );
+            }
+            return;
+          }
+
+          progress.report({ increment: 40 });
+
+          // Get all cloud commands and their categories
+          const allCloudCommands = dataService.getCloudCommands();
+          const cloudCategoriesSet = new Set<string>();
+
+          allCloudCommands.forEach((cmd) => {
+            cloudCategoriesSet.add(
+              cmd.category || dataService.getDefaultCategory()
+            );
+          });
+
+          const cloudCategories = Array.from(cloudCategoriesSet);
+
+          if (cloudCategories.length === 0) {
+            vscode.window.showErrorMessage(
+              "No categories found in GitLab data."
+            );
+            return;
+          }
+
+          // Let user select categories to sync
+          const selectedCategories = await vscode.window.showQuickPick(
+            cloudCategories.map((category) => ({ label: category })),
+            {
+              canPickMany: true,
+              placeHolder: "Select categories to sync from GitLab",
+              title: "Sync Categories",
+            }
+          );
+
+          if (!selectedCategories || selectedCategories.length === 0) {
+            vscode.window.showInformationMessage(
+              "No categories selected for sync."
+            );
+            return;
+          }
+
+          progress.report({ increment: 20 });
+
+          const categoriesToSync = selectedCategories.map((item) => item.label);
+
+          // Sync only selected categories
+          const result =
+            await dataService.syncSelectedFromGitLab(categoriesToSync);
+
+          progress.report({ increment: 20 });
 
           if (result.success) {
             memoTreeProvider.updateView();
             vscode.window.showInformationMessage(
-              `Successfully synced ${result.syncedCommands} team commands from GitLab`
+              `Successfully synced ${result.syncedCommands} team commands from selected categories.`
             );
           } else {
             const action = await vscode.window.showErrorMessage(
