@@ -29,7 +29,7 @@ export class CategoryTreeItem extends vscode.TreeItem {
   ) {
     super(label, collapsibleState);
     this.contextValue = isCloud ? "cloudCategory" : "category";
-    this.iconPath = new vscode.ThemeIcon(isCloud ? "cloud" : "folder");
+    this.iconPath = new vscode.ThemeIcon("folder");
   }
 }
 
@@ -221,9 +221,7 @@ export class MemoTreeDataProvider
     );
 
     treeItem.description = new Date(element.timestamp).toLocaleString();
-    treeItem.iconPath = new vscode.ThemeIcon(
-      element.isCloud ? "cloud" : "note"
-    );
+    treeItem.iconPath = new vscode.ThemeIcon("note");
     treeItem.tooltip = element.command;
     treeItem.contextValue = element.isCloud ? "cloudMemoItem" : "memoItem";
 
