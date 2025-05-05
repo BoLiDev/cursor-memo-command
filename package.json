@@ -81,24 +81,25 @@
         "command": "cursor-memo.exportCommands",
         "title": "Export Commands",
         "category": "Cursor Memo",
-        "icon": "$(arrow-up)"
+        "icon": "$(arrow-down)"
       },
       {
         "command": "cursor-memo.importCommands",
         "title": "Import Commands",
         "category": "Cursor Memo",
-        "icon": "$(arrow-down)"
+        "icon": "$(arrow-up)"
       },
       {
         "command": "cursor-memo.syncFromGitLab",
-        "title": "Sync Team Commands from GitLab",
+        "title": "Sync from GitLab",
         "category": "Cursor Memo",
-        "icon": "$(cloud-download)"
+        "icon": "$(sync)"
       },
       {
         "command": "cursor-memo.manageGitLabToken",
         "title": "Manage GitLab Token",
-        "category": "Cursor Memo"
+        "category": "Cursor Memo",
+        "icon": "$(key)"
       }
     ],
     "views": {
@@ -111,6 +112,36 @@
     },
     "menus": {
       "view/item/context": [
+        {
+          "command": "cursor-memo.saveCommand",
+          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "group": "inline@1"
+        },
+        {
+          "command": "cursor-memo.addCategory",
+          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "group": "inline@2"
+        },
+        {
+          "command": "cursor-memo.importCommands",
+          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "group": "inline@3"
+        },
+        {
+          "command": "cursor-memo.exportCommands",
+          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "group": "inline@4"
+        },
+        {
+          "command": "cursor-memo.syncFromGitLab",
+          "when": "view == cursorMemoPanel && viewItem == cloudGroup",
+          "group": "inline@1"
+        },
+        {
+          "command": "cursor-memo.manageGitLabToken",
+          "when": "view == cursorMemoPanel && viewItem == cloudGroup",
+          "group": "inline@2"
+        },
         {
           "command": "cursor-memo.renameCommand",
           "when": "view == cursorMemoPanel && viewItem == memoItem",
@@ -152,43 +183,7 @@
           "group": "inline"
         }
       ],
-      "view/title": [
-        {
-          "command": "cursor-memo.saveCommand",
-          "when": "view == cursorMemoPanel",
-          "group": "navigation",
-          "icon": "$(add)"
-        },
-        {
-          "command": "cursor-memo.addCategory",
-          "when": "view == cursorMemoPanel",
-          "group": "navigation",
-          "icon": "$(book)"
-        },
-        {
-          "command": "cursor-memo.exportCommands",
-          "when": "view == cursorMemoPanel",
-          "group": "navigation",
-          "icon": "$(arrow-up)"
-        },
-        {
-          "command": "cursor-memo.importCommands",
-          "when": "view == cursorMemoPanel",
-          "group": "navigation",
-          "icon": "$(arrow-down)"
-        },
-        {
-          "command": "cursor-memo.syncFromGitLab",
-          "when": "view == cursorMemoPanel",
-          "group": "navigation",
-          "icon": "$(cloud-download)"
-        },
-        {
-          "command": "cursor-memo.manageGitLabToken",
-          "when": "view == cursorMemoPanel",
-          "group": "9_sync@1"
-        }
-      ]
+      "view/title": []
     },
     "configuration": {
       "title": "Cursor Memo",
