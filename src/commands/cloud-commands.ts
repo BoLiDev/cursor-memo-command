@@ -6,8 +6,8 @@ import { MemoTreeDataProvider } from "../view/tree-provider";
 import { CategoryTreeItem } from "../view/tree-items";
 
 /**
- * Creates the remove cloud category handler
- * 允许用户删除本地云端分类的功能（不影响云端数据）
+ * Creates the remove cloud category handler.
+ * Allows removing a cloud category locally without affecting remote data.
  * @param gitlabService The GitLab service client
  * @param memoTreeProvider The memo tree data provider
  * @returns The remove cloud category handler function
@@ -47,14 +47,14 @@ export function createSyncFromGitLabHandler(
   memoTreeProvider: MemoTreeDataProvider
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    // 获取本地已知的云端分类以供选择
+    // Get locally known cloud categories for selection
     const cloudCategories = new Set<string>();
     gitlabService.getCloudCommands().forEach((item) => {
       cloudCategories.add(item.category);
     });
     const availableCloudCategories = Array.from(cloudCategories);
 
-    // 如果本地没有云分类，执行全量同步 (可能是首次同步)
+    // If no cloud categories are known locally, perform full sync (likely first time)
     if (availableCloudCategories.length === 0) {
       vscode.window.withProgress(
         {
@@ -80,7 +80,7 @@ export function createSyncFromGitLabHandler(
       return;
     }
 
-    // 提供选择本地已知分类或全部同步的选项
+    // Provide options to sync selected local categories or all
     const allOption = "Sync All Categories (Overwrite Local)";
     const options = [allOption, ...availableCloudCategories];
 
@@ -104,12 +104,12 @@ export function createSyncFromGitLabHandler(
         let result;
         let categoriesToSync: string[] = [];
 
-        // 检查是否选择了"全部"选项
+        // Check if "all" option was selected
         if (selectedOption.includes(allOption)) {
           progress.report({ message: "Syncing all categories..." });
           result = await gitlabService.syncFromGitLab();
         } else {
-          // 仅同步选定的分类
+          // Sync only selected categories
           categoriesToSync = selectedOption;
           progress.report({
             message: `Syncing ${categoriesToSync.length} selected categories...`,

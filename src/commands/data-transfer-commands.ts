@@ -24,7 +24,7 @@ export function createExportCommandsHandler(
       return;
     }
 
-    // 提供选择分类或全部导出的选项
+    // Provide options to export selected categories or all
     const allOption = "All categories";
     const options = [allOption, ...categories];
 
@@ -39,10 +39,10 @@ export function createExportCommandsHandler(
 
     let exportData: string;
     if (selectedOption.includes(allOption)) {
-      // 导出所有分类
+      // Export all categories
       exportData = dataTransferService.exportData();
     } else {
-      // 只导出选定的分类
+      // Export only selected categories
       exportData = dataTransferService.exportSelectedCategories(selectedOption);
     }
 
@@ -97,7 +97,7 @@ export function createImportCommandsHandler(
         const fileContents = fs.readFileSync(uris[0].fsPath, "utf8");
 
         try {
-          // 解析导入文件中的分类，以便让用户选择导入哪些分类
+          // Parse categories from the imported file to allow user selection
           const importData = JSON.parse(fileContents);
           const availableCategories = new Set<string>();
           const defaultCategory = dataService.getDefaultCategory();
@@ -125,7 +125,7 @@ export function createImportCommandsHandler(
             return;
           }
 
-          // 提供选择分类或全部导入的选项
+          // Provide options to import selected categories or all
           const allOption = "All categories";
           const options = [allOption, ...categories];
 
@@ -139,14 +139,14 @@ export function createImportCommandsHandler(
           }
 
           if (selectedOption.includes(allOption)) {
-            // 导入所有分类
+            // Import all categories
             await importAllData(
               fileContents,
               dataTransferService,
               memoTreeProvider
             );
           } else {
-            // 只导入选定的分类
+            // Import only selected categories
             await importSelectedData(
               fileContents,
               selectedOption,

@@ -37,7 +37,6 @@ export class LocalMemoService {
       []
     );
 
-    // Ensure all loaded commands have a category
     this.commands = storedCommands.map((cmd) => {
       if (!cmd.category) {
         return { ...cmd, category: LocalMemoService.DEFAULT_CATEGORY };
@@ -45,7 +44,6 @@ export class LocalMemoService {
       return cmd;
     });
 
-    // Save back if any command was updated with the default category
     if (JSON.stringify(storedCommands) !== JSON.stringify(this.commands)) {
       await this.saveCommands();
     }
@@ -55,7 +53,6 @@ export class LocalMemoService {
       []
     );
 
-    // Ensure the default category exists
     if (!this.categories.includes(LocalMemoService.DEFAULT_CATEGORY)) {
       this.categories.push(LocalMemoService.DEFAULT_CATEGORY);
       await this.saveCategories();
@@ -120,7 +117,6 @@ export class LocalMemoService {
    * @returns Promise that resolves when commands are added
    */
   public async addCommands(newCommands: MemoItem[]): Promise<void> {
-    // Ensure added commands are marked as local
     const localNewCommands = newCommands.map((cmd) => ({
       ...cmd,
       isCloud: false,
@@ -187,7 +183,6 @@ export class LocalMemoService {
         return {
           ...cmd,
           command: newCommand,
-          // Update label only if there's no alias
           label: cmd.alias ? cmd.label : newLabel,
         };
       }
@@ -264,7 +259,6 @@ export class LocalMemoService {
 
     this.categories = this.categories.filter((cat) => cat !== categoryName);
 
-    // Save both commands (if any were moved) and categories
     await Promise.all([
       commandsMoved > 0 ? this.saveCommands() : Promise.resolve(),
       this.saveCategories(),
@@ -313,7 +307,6 @@ export class LocalMemoService {
       return cmd;
     });
 
-    // Save only if changes occurred
     const promises = [];
     if (commandsUpdated) promises.push(this.saveCommands());
     if (categoryUpdated) promises.push(this.saveCategories());
@@ -337,7 +330,6 @@ export class LocalMemoService {
     targetCategory: string
   ): Promise<boolean> {
     if (!this.categories.includes(targetCategory)) {
-      // Target category must exist locally
       return false;
     }
 

@@ -1,13 +1,12 @@
 /** @format */
 
 import * as vscode from "vscode";
-import fetch, { Response } from "node-fetch"; // Use node-fetch and Response type
+import fetch, { Response } from "node-fetch";
 import { z } from "zod";
-// Import necessary schemas
 import { MemoItemSchema, GitLabFileContentSchema } from "../zod/gitlab";
 import { MemoItem } from "../models/memo-item";
 
-// Schema for the structure *inside* the decoded GitLab file content
+// Schema for the structure inside the decoded GitLab file content
 const teamCommandsSchema = z.object({
   commands: z.array(MemoItemSchema),
   categories: z.array(z.string()).optional(),
@@ -18,7 +17,7 @@ const teamCommandsSchema = z.object({
  * Combines original fetch logic with cloud state management.
  */
 export class GitlabClient {
-  private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token"; // Original key name
+  private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "default";
 
@@ -31,14 +30,11 @@ export class GitlabClient {
   private initialized: boolean = false;
 
   constructor(private context: vscode.ExtensionContext) {
-    // Read config using correct keys from package.json
     const config = vscode.workspace.getConfiguration("cursorMemo");
-    this.domain = normalizeGitLabDomain(
-      config.get<string>("gitlabDomain") // Use correct key
-    );
-    this.projectId = config.get<string>("gitlabProjectId") || "9993"; // Use correct key
-    this.filePath = config.get<string>("gitlabFilePath") || "prompt.json"; // Use correct key
-    this.branch = config.get<string>("gitlabBranch") || "master"; // Use correct key
+    this.domain = normalizeGitLabDomain(config.get<string>("gitlabDomain"));
+    this.projectId = config.get<string>("gitlabProjectId") || "9993";
+    this.filePath = config.get<string>("gitlabFilePath") || "prompt.json";
+    this.branch = config.get<string>("gitlabBranch") || "master";
   }
 
   /**
@@ -48,10 +44,8 @@ export class GitlabClient {
     if (this.initialized) {
       return;
     }
-    // Check config on initialization
     if (!this.projectId || !this.filePath) {
       console.error("GitLab Project ID or File Path is not configured.");
-      // Optionally throw an error or prevent further operations
     }
     await this.loadCloudCommands();
     this.initialized = true;
@@ -81,13 +75,11 @@ export class GitlabClient {
   /**
    * Get GitLab Personal Access Token from Secret Storage.
    * If token doesn't exist, interactively ask the user to input it.
-   * (Restored from original src/gitlab.ts)
    */
   public async getToken(): Promise<string | undefined> {
     let token = await this.context.secrets.get(GitlabClient.GITLAB_TOKEN_KEY);
 
     if (!token) {
-      // Use correct key for storing if fetched interactively
       const inputToken = await vscode.window.showInputBox({
         prompt: "Enter GitLab Personal Access Token",
         placeHolder: "Enter your GitLab token to sync team commands",
@@ -103,7 +95,6 @@ export class GitlabClient {
         );
         token = inputToken;
       } else {
-        // User cancelled the input
         vscode.window.showErrorMessage("GitLab token is required to sync.");
         return undefined;
       }
@@ -113,7 +104,6 @@ export class GitlabClient {
 
   /**
    * Get file content from GitLab project.
-   * (Restored from original src/gitlab.ts)
    *
    * @param token - GitLab Personal Access Token
    * @returns Promise resolving to the parsed file content metadata (including base64 content)
@@ -121,7 +111,6 @@ export class GitlabClient {
   private async getFileContent(
     token: string
   ): Promise<z.infer<typeof GitLabFileContentSchema>> {
-    // Ensure config is loaded (redundant if initialize is called, but safe)
     if (!this.projectId || !this.filePath) {
       throw new Error("GitLab Project ID or File Path not configured.");
     }
@@ -133,22 +122,19 @@ export class GitlabClient {
 
     try {
       const response = await fetch(url, {
-        method: "GET", // Ensure method is specified
+        method: "GET",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          // Use Bearer token as in original file
           Authorization: `Bearer ${token}`,
           "User-Agent": "VSCode Cursor Memo Extension",
         },
-        timeout: 15000, // Keep timeout
+        timeout: 15000,
       });
 
-      // Use original error handler
       await handleGitLabError(response);
 
       const fileData = await response.json();
-      // Validate the file metadata structure against GitLabFileContentSchema
       const validationResult = GitLabFileContentSchema.safeParse(fileData);
       if (!validationResult.success) {
         console.error(
@@ -159,11 +145,9 @@ export class GitlabClient {
           `Invalid file metadata format from GitLab: ${validationResult.error.message}`
         );
       }
-      // Return the validated file metadata (includes base64 content)
       return validationResult.data;
     } catch (error) {
       console.error(`Error in getFileContent for ${url}:`, error);
-      // Re-throw error to be handled by the caller (fetchTeamCommands)
       throw error;
     }
   }
@@ -171,26 +155,22 @@ export class GitlabClient {
   /**
    * Fetches, decodes, parses, and validates team commands from GitLab file content.
    * Calls getFileContent and then processes the result.
-   * @returns Promise with parsed *command data* (commands and categories) or an error.
+   * @returns Promise with parsed command data (commands and categories) or an error.
    */
   public async fetchTeamCommands(): Promise<{
     success: boolean;
-    data?: z.infer<typeof teamCommandsSchema>; // Data is the parsed commands/categories
+    data?: z.infer<typeof teamCommandsSchema>;
     error?: string;
   }> {
     let token: string | undefined;
     try {
-      // Get token (includes interactive prompt if needed)
       token = await this.getToken();
       if (!token) {
-        // getToken shows error message if user cancels
         return { success: false, error: "GitLab token not provided." };
       }
 
-      // Fetch file metadata (includes base64 content)
       const fileData = await this.getFileContent(token);
 
-      // Decode Base64 content
       if (!fileData.content) {
         console.error(
           "getFileContent returned success but content was missing."
@@ -204,7 +184,6 @@ export class GitlabClient {
         "utf-8"
       );
 
-      // Parse the decoded content as JSON
       let jsonData: any;
       try {
         jsonData = JSON.parse(decodedContent);
@@ -216,7 +195,6 @@ export class GitlabClient {
         };
       }
 
-      // Validate the *parsed JSON data structure* against teamCommandsSchema
       const validationResult = teamCommandsSchema.safeParse(jsonData);
       if (!validationResult.success) {
         console.error(
@@ -231,11 +209,9 @@ export class GitlabClient {
         };
       }
 
-      // Return the validated commands and categories
       return { success: true, data: validationResult.data };
     } catch (error: any) {
       console.error("Failed to fetch team commands from GitLab:", error);
-      // Handle specific errors like 401/403 if needed, or return generic message
       let userMessage =
         error.message || "An unknown error occurred during GitLab sync.";
       if (
@@ -244,11 +220,6 @@ export class GitlabClient {
       ) {
         userMessage =
           "Failed to fetch team commands from GitLab. Token might be invalid or lack permissions.";
-        // Optionally clear the invalid token
-        if (token) {
-          // Maybe only clear on 401?
-          // await this.clearToken();
-        }
       }
       return {
         success: false,
@@ -257,7 +228,7 @@ export class GitlabClient {
     }
   }
 
-  // --- Cloud Command State Management (Keep Existing Logic) ---
+  // --- Cloud Command State Management ---
 
   /**
    * Synchronize all commands from GitLab.
@@ -267,7 +238,7 @@ export class GitlabClient {
     syncedCommands: number;
     error?: string;
   }> {
-    const fetchResult = await this.fetchTeamCommands(); // Uses the restored fetch logic
+    const fetchResult = await this.fetchTeamCommands();
 
     if (!fetchResult.success || !fetchResult.data) {
       return {
@@ -312,7 +283,7 @@ export class GitlabClient {
     syncedCommands: number;
     error?: string;
   }> {
-    const fetchResult = await this.fetchTeamCommands(); // Uses the restored fetch logic
+    const fetchResult = await this.fetchTeamCommands();
 
     if (!fetchResult.success || !fetchResult.data) {
       return {
@@ -400,25 +371,22 @@ export class GitlabClient {
   }
 }
 
-// --- Helper Functions (Restored from original src/gitlab.ts) ---
+// --- Helper Functions ---
 
 /**
  * Normalize GitLab API URL
  */
 function normalizeGitLabDomain(url?: string): string {
   if (!url) {
-    // Default to gitlab.com if no URL provided in config
     console.warn("GitLab domain not configured, defaulting to gitlab.com");
     return "https://gitlab.com/api/v4";
   }
 
   let normalizedUrl = url.trim();
-  // Remove trailing slash if present
   if (normalizedUrl.endsWith("/")) {
     normalizedUrl = normalizedUrl.slice(0, -1);
   }
 
-  // Add /api/v4 if it's not already present
   if (!normalizedUrl.endsWith("/api/v4")) {
     normalizedUrl = `${normalizedUrl}/api/v4`;
   }
@@ -432,18 +400,15 @@ function normalizeGitLabDomain(url?: string): string {
 async function handleGitLabError(response: Response): Promise<void> {
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error(`GitLab API Error (${response.status}): ${errorBody}`); // Log the raw error
+    console.error(`GitLab API Error (${response.status}): ${errorBody}`);
 
-    // Specific error handling (optional)
     if (response.status === 401) {
       throw new Error(
         `GitLab API error: 401 Unauthorized. Check your Personal Access Token.`
       );
     }
     if (response.status === 403) {
-      // Could be permissions or rate limit
       if (errorBody.includes("Rate limit exceeded")) {
-        // Be more specific if possible
         throw new Error(`GitLab API Rate Limit Exceeded: ${errorBody}`);
       } else {
         throw new Error(
@@ -457,7 +422,6 @@ async function handleGitLabError(response: Response): Promise<void> {
       );
     }
 
-    // Generic error for other statuses
     throw new Error(
       `GitLab API error: ${response.status} ${response.statusText}. Details: ${errorBody}`
     );
