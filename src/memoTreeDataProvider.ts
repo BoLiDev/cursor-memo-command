@@ -4,6 +4,21 @@ import * as vscode from "vscode";
 import { MemoItem, MemoDataService } from "./memoDataService";
 
 /**
+ * Category group type (top level node: Local/Cloud)
+ */
+export class CategoryGroupTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly isCloud: boolean = false
+  ) {
+    super(label, collapsibleState);
+    this.contextValue = "categoryGroup";
+    this.iconPath = new vscode.ThemeIcon(isCloud ? "cloud" : "library");
+  }
+}
+
+/**
  * Category node type
  */
 export class CategoryTreeItem extends vscode.TreeItem {
@@ -22,16 +37,32 @@ export class CategoryTreeItem extends vscode.TreeItem {
  * TreeView data provider - responsible for rendering the view
  */
 export class MemoTreeDataProvider
-  implements vscode.TreeDataProvider<CategoryTreeItem | MemoItem>
+  implements
+    vscode.TreeDataProvider<CategoryGroupTreeItem | CategoryTreeItem | MemoItem>
 {
   private _onDidChangeTreeData: vscode.EventEmitter<
-    CategoryTreeItem | MemoItem | undefined | null | void
+    | CategoryGroupTreeItem
+    | CategoryTreeItem
+    | MemoItem
+    | undefined
+    | null
+    | void
   > = new vscode.EventEmitter<
-    CategoryTreeItem | MemoItem | undefined | null | void
+    | CategoryGroupTreeItem
+    | CategoryTreeItem
+    | MemoItem
+    | undefined
+    | null
+    | void
   >();
 
   readonly onDidChangeTreeData: vscode.Event<
-    CategoryTreeItem | MemoItem | undefined | null | void
+    | CategoryGroupTreeItem
+    | CategoryTreeItem
+    | MemoItem
+    | undefined
+    | null
+    | void
   > = this._onDidChangeTreeData.event;
 
   private commandCallback: string | undefined;
@@ -40,11 +71,26 @@ export class MemoTreeDataProvider
   private categoryNodes: Map<string, CategoryTreeItem> = new Map();
   private cloudCategoryNodes: Map<string, CategoryTreeItem> = new Map();
 
+  // Top level group nodes
+  private localGroupNode: CategoryGroupTreeItem;
+  private cloudGroupNode: CategoryGroupTreeItem;
+
   /**
    * Constructor
    * @param dataService Data service instance that provides categories and commands data
    */
   constructor(private dataService: MemoDataService) {
+    this.localGroupNode = new CategoryGroupTreeItem(
+      "Local",
+      vscode.TreeItemCollapsibleState.Expanded
+    );
+
+    this.cloudGroupNode = new CategoryGroupTreeItem(
+      "Cloud",
+      vscode.TreeItemCollapsibleState.Expanded,
+      true
+    );
+
     this.updateView();
   }
 
@@ -157,8 +203,13 @@ export class MemoTreeDataProvider
    * @param element Element (category or command item) to get display information for
    * @returns Configured TreeItem instance
    */
-  getTreeItem(element: CategoryTreeItem | MemoItem): vscode.TreeItem {
-    if (element instanceof CategoryTreeItem) {
+  getTreeItem(
+    element: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+  ): vscode.TreeItem {
+    if (
+      element instanceof CategoryGroupTreeItem ||
+      element instanceof CategoryTreeItem
+    ) {
       return element;
     }
 
@@ -194,36 +245,55 @@ export class MemoTreeDataProvider
    * @returns Array of child elements
    */
   getChildren(
-    element?: CategoryTreeItem | MemoItem
-  ): (CategoryTreeItem | MemoItem)[] {
+    element?: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+  ): (CategoryGroupTreeItem | CategoryTreeItem | MemoItem)[] {
     if (!element) {
-      // Return both local and cloud categories at the root level
-      const defaultCategory = this.dataService.getDefaultCategory();
+      // Return top level groups at the root
+      const hasLocalCategories = this.categories.size > 0;
 
-      // Get all local categories and sort them
-      const sortedLocalCategories = Array.from(this.categories.keys()).sort(
-        (a, b) => {
-          if (a === defaultCategory) return 1;
-          if (b === defaultCategory) return -1;
-          return a.localeCompare(b);
-        }
-      );
+      const result: CategoryGroupTreeItem[] = [];
 
-      // Get all cloud categories and sort them
-      const sortedCloudCategories = Array.from(
-        this.cloudCategories.keys()
-      ).sort((a, b) => a.localeCompare(b));
+      if (hasLocalCategories) {
+        result.push(this.localGroupNode);
+      }
 
-      // Combine local and cloud categories, with cloud categories first
-      const localCategoryNodes = sortedLocalCategories.map(
-        (category) => this.categoryNodes.get(category)!
-      );
+      // 始终显示Cloud分类，即使它为空
+      result.push(this.cloudGroupNode);
 
-      const cloudCategoryNodes = sortedCloudCategories.map(
-        (category) => this.cloudCategoryNodes.get(category)!
-      );
+      return result;
+    }
 
-      return [...cloudCategoryNodes, ...localCategoryNodes];
+    // Handle group nodes
+    if (element instanceof CategoryGroupTreeItem) {
+      if (element.isCloud) {
+        // Return cloud categories under cloud group
+        const defaultCategory = this.dataService.getDefaultCategory();
+
+        // Get all cloud categories and sort them
+        const sortedCloudCategories = Array.from(
+          this.cloudCategories.keys()
+        ).sort((a, b) => a.localeCompare(b));
+
+        return sortedCloudCategories.map(
+          (category) => this.cloudCategoryNodes.get(category)!
+        );
+      } else {
+        // Return local categories under local group
+        const defaultCategory = this.dataService.getDefaultCategory();
+
+        // Get all local categories and sort them
+        const sortedLocalCategories = Array.from(this.categories.keys()).sort(
+          (a, b) => {
+            if (a === defaultCategory) return 1;
+            if (b === defaultCategory) return -1;
+            return a.localeCompare(b);
+          }
+        );
+
+        return sortedLocalCategories.map(
+          (category) => this.categoryNodes.get(category)!
+        );
+      }
     }
 
     if (element instanceof CategoryTreeItem) {
@@ -245,19 +315,28 @@ export class MemoTreeDataProvider
    * @returns Parent element, or null if there is none
    */
   getParent(
-    element: CategoryTreeItem | MemoItem
-  ): vscode.ProviderResult<CategoryTreeItem | MemoItem> {
-    if (!(element instanceof CategoryTreeItem)) {
-      const categoryName =
-        element.category || this.dataService.getDefaultCategory();
-
-      if (element.isCloud) {
-        return this.cloudCategoryNodes.get(categoryName);
-      } else {
-        return this.categoryNodes.get(categoryName);
-      }
+    element: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+  ): vscode.ProviderResult<
+    CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+  > {
+    if (element instanceof CategoryGroupTreeItem) {
+      // Group nodes have no parent
+      return null;
     }
 
-    return null;
+    if (element instanceof CategoryTreeItem) {
+      // Category nodes' parent is the appropriate group node
+      return element.isCloud ? this.cloudGroupNode : this.localGroupNode;
+    }
+
+    // MemoItem's parent is its category node
+    const categoryName =
+      element.category || this.dataService.getDefaultCategory();
+
+    if (element.isCloud) {
+      return this.cloudCategoryNodes.get(categoryName);
+    } else {
+      return this.categoryNodes.get(categoryName);
+    }
   }
 }
