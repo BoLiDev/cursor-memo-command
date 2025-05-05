@@ -19,6 +19,7 @@ import {
   createImportCommandsHandler,
   createSyncFromGitLabHandler,
   createManageGitLabTokenHandler,
+  createRemoveCloudCategoryHandler,
 } from "./commands";
 
 /**
@@ -83,6 +84,12 @@ export function activate(context: vscode.ExtensionContext) {
         "cursor-memo.deleteCategory",
         createDeleteCategoryHandler(dataService, memoTreeProvider),
         "Error deleting category"
+      );
+
+      const removeCloudCategoryDisposable = createCommand(
+        "cursor-memo.removeCloudCategory",
+        createRemoveCloudCategoryHandler(dataService, memoTreeProvider),
+        "Error removing cloud category"
       );
 
       const moveToCategory = createCommand(
@@ -154,6 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
         addCategoryDisposable,
         renameCategoryDisposable,
         deleteCategoryDisposable,
+        removeCloudCategoryDisposable,
         moveToCategory,
         addCommandToCategory,
         exportCommands,

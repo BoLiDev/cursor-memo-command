@@ -569,3 +569,32 @@ export function createManageGitLabTokenHandler(
     }
   };
 }
+
+/**
+ * Creates the remove cloud category handler
+ * @param dataService The memo data service
+ * @param memoTreeProvider The memo tree data provider
+ * @returns The remove cloud category handler function
+ */
+export function createRemoveCloudCategoryHandler(
+  dataService: MemoDataService,
+  memoTreeProvider: MemoTreeDataProvider
+): (...args: any[]) => Promise<void> {
+  return async (categoryItem: CategoryTreeItem) => {
+    if (!categoryItem || !categoryItem.isCloud) {
+      return;
+    }
+
+    const categoryName = categoryItem.label;
+
+    const result = await dataService.removeCloudCategory(categoryName);
+
+    if (result.success) {
+      memoTreeProvider.updateView();
+
+      vscode.window.showInformationMessage(
+        `Cloud category "${categoryName}" removed (${result.removedCommands} commands). You can get it back by syncing from GitLab again.`
+      );
+    }
+  };
+}

@@ -490,8 +490,38 @@ export class MemoDataService {
   }
 
   /**
-   * Clear stored GitLab token
-   * This can be called when token becomes invalid
+   * Remove cloud category from local storage
+   * Only removes the category and its commands from local storage, doesn't affect cloud data
+   * @param categoryName Name of the cloud category to remove locally
+   * @returns Promise with removal result
+   */
+  public async removeCloudCategory(categoryName: string): Promise<{
+    success: boolean;
+    removedCommands: number;
+  }> {
+    // Count the number of commands in this category
+    const categoryCommands = this.cloudCommands.filter(
+      (cmd) => cmd.category === categoryName
+    );
+    const commandCount = categoryCommands.length;
+
+    // Remove all commands from this cloud category
+    this.cloudCommands = this.cloudCommands.filter(
+      (cmd) => cmd.category !== categoryName
+    );
+
+    // Save the updated cloud commands
+    await this.saveCloudCommands();
+
+    return {
+      success: true,
+      removedCommands: commandCount,
+    };
+  }
+
+  /**
+   * Clear GitLab token
+   * Removes the stored GitLab token, requiring re-authentication for future GitLab operations
    */
   public async clearGitLabToken(): Promise<void> {
     await this.gitlabClient.clearToken();
