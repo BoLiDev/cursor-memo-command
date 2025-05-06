@@ -1,18 +1,8 @@
 /** @format */
 
-import * as vscode from "vscode";
 import { LocalService } from "../services/local-service";
 import { Prompt } from "../models/prompt";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
-
-// TODO: Move directPaste to a suitable utility
-async function directPaste(): Promise<void> {
-  try {
-    await vscode.commands.executeCommand("editor.action.clipboardPasteAction");
-  } catch {
-    // ignore
-  }
-}
 
 /**
  * Creates the save prompt handler
@@ -116,7 +106,7 @@ export function createPasteToEditorHandler(
 
     await uiService.openCursorChat();
     await uiService.writeClipboard(item.content);
-    await directPaste();
+    await uiService.pasteClipboard();
   };
 }
 

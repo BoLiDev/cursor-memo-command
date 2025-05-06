@@ -370,6 +370,16 @@ export class VSCodeUserInteractionService {
     return Promise.resolve(vscode.env.clipboard.writeText(value));
   }
 
+  async pasteClipboard(): Promise<void> {
+    try {
+      await vscode.commands.executeCommand(
+        "editor.action.clipboardPasteAction"
+      );
+    } catch {
+      // ignore
+    }
+  }
+
   /**
    * Writes text to the cursor chat using the composer.startComposerPrompt command
    * @param text The text to write
