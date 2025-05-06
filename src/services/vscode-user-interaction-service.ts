@@ -1,21 +1,12 @@
 /** @format */
 
 import * as vscode from "vscode";
-// Removed interface imports
-// import {
-//     IUserInteractionService,
-//     InputBoxOptions,
-//     QuickPickOptions,
-//     ProgressOptions,
-//     QuickPickItem
-// } from './user-interaction-service.interface';
 
 /**
  * Concrete implementation for UI interactions using the vscode API.
  * This class can be used directly as a type for dependency injection.
  */
-// Remove implements clause
-export class VSCodeUserInteractionService /* implements IUserInteractionService */ {
+export class VSCodeUserInteractionService {
   showInputBox(
     options?: vscode.InputBoxOptions,
     token?: vscode.CancellationToken
@@ -23,7 +14,6 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     return Promise.resolve(vscode.window.showInputBox(options, token));
   }
 
-  // Implementing the overloaded showQuickPick signatures
   showQuickPick<T extends vscode.QuickPickItem>(
     items: ReadonlyArray<T> | Thenable<ReadonlyArray<T>>,
     options?: vscode.QuickPickOptions & { canPickMany?: false },
@@ -42,7 +32,6 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     return Promise.resolve(vscode.window.showQuickPick(items, options, token));
   }
 
-  // Implementing the overloaded showInformationMessage signatures
   showInformationMessage(
     message: string,
     ...items: string[]
@@ -83,7 +72,6 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     return Promise.resolve(result);
   }
 
-  // Implementing the overloaded showWarningMessage signatures
   showWarningMessage(
     message: string,
     ...items: string[]
@@ -120,7 +108,6 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     return Promise.resolve(result);
   }
 
-  // Implementing the overloaded showErrorMessage signatures
   showErrorMessage(
     message: string,
     ...items: string[]
@@ -164,7 +151,6 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     return vscode.window.withProgress(options, task);
   }
 
-  // Implementation for createMultilineInputBox (moved from ui-helpers)
   async createMultilineInputBox(
     title: string,
     placeHolder: string,
@@ -174,11 +160,7 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     inputBox.title = title;
     inputBox.placeholder = placeHolder;
     inputBox.value = value;
-    inputBox.ignoreFocusOut = true; // Keep open even if focus is lost
-    // inputBox.multiline = true; // Enable multiline input -- THIS IS NOT AVAILABLE ON STANDARD INPUT BOX
-    // For true multiline, a webview or quick pick with custom input is needed.
-    // This implementation keeps the single-line input box but makes it persistent.
-    // A better approach might be needed if true multiline editing is required.
+    inputBox.ignoreFocusOut = true;
     console.warn(
       "createMultilineInputBox currently uses a standard persistent InputBox, not true multiline."
     );
@@ -186,7 +168,7 @@ export class VSCodeUserInteractionService /* implements IUserInteractionService 
     inputBox.buttons = [
       {
         iconPath: new vscode.ThemeIcon("save"),
-        tooltip: "Confirm (Enter)", // Changed tooltip to reflect Enter key confirmation
+        tooltip: "Confirm (Enter)",
       },
     ];
 

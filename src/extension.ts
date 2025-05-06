@@ -2,7 +2,6 @@
 
 import * as vscode from "vscode";
 
-// Import services
 import { LocalMemoService } from "./services/local-data-service";
 import { GitlabApiService } from "./services/gitlab-api-service";
 import { CloudStoreService } from "./services/cloud-store-service";
@@ -10,7 +9,6 @@ import { StorageService } from "./services/storage-service";
 import { ConfigurationService } from "./services/configuration-service";
 import { VSCodeUserInteractionService } from "./services/vscode-user-interaction-service"; // Use class
 
-// Import view provider and required types
 import {
   MemoTreeDataProvider,
   CategoryGroupTreeItem,
@@ -43,9 +41,7 @@ import {
 } from "./commands/data-transfer-commands";
 import { createPushToGitLabHandler } from "./commands/gitlab-push-command";
 
-// Tree Data Provider instance
 let memoTreeProvider: MemoTreeDataProvider;
-// Use the more specific type provided by the TreeDataProvider
 let memoTreeView: vscode.TreeView<
   CategoryGroupTreeItem | CategoryTreeItem | MemoItem
 >;
@@ -57,7 +53,6 @@ let memoTreeView: vscode.TreeView<
 export async function activate(context: vscode.ExtensionContext) {
   console.log('"cursor-memo" is now active!');
 
-  // --- Initialization ---
   // Instantiate core services first
   const storageService = new StorageService(context);
   const configService = new ConfigurationService(context);
@@ -94,8 +89,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set the command to be executed when a memo item is clicked (no change needed)
   memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
-  // --- Register Commands ---
-  // Pass the VSCodeUserInteractionService instance
+  // Register Commands
   const commands: { [key: string]: (...args: any[]) => Promise<void> } = {
     // Local Commands
     "cursor-memo.saveCommand": createSaveCommandHandler(
@@ -178,8 +172,6 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(commandId, commands[commandId])
     );
   }
-
-  // Initial view is populated automatically...
 }
 
 /**

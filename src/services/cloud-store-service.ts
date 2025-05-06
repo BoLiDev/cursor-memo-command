@@ -13,7 +13,6 @@ import { ConfigurationService } from "./configuration-service";
 import { GitlabApiService, GitlabApiError } from "./gitlab-api-service";
 import { z } from "zod";
 
-// Result type for operations that might require user interaction (like missing token)
 export type CloudOperationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string; needsAuth?: boolean };
@@ -27,7 +26,6 @@ export class CloudStoreService {
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "Default";
 
-  // --- Event Emitters ---
   private _onDidCloudCommandsChange = new vscode.EventEmitter<void>();
   readonly onDidCloudCommandsChange: vscode.Event<void> =
     this._onDidCloudCommandsChange.event;
@@ -147,8 +145,6 @@ export class CloudStoreService {
       return { success: false, error: message };
     }
   }
-
-  // --- Cloud Command State Management Methods ---
 
   /**
    * Fetches all commands from GitLab and updates the local cloud state.
@@ -360,8 +356,6 @@ export class CloudStoreService {
     }
   }
 
-  // --- Token Management --- (Moved from GitlabClient, using StorageService)
-
   /**
    * Set GitLab Personal Access Token.
    */
@@ -380,8 +374,6 @@ export class CloudStoreService {
     await this.storageService.deleteSecret(CloudStoreService.GITLAB_TOKEN_KEY);
     console.log("GitLab token cleared.");
   }
-
-  // --- Persistence Methods ---
 
   private async saveCloudCommands(): Promise<void> {
     await this.storageService.setValue(
@@ -431,7 +423,6 @@ export class CloudStoreService {
   }
 }
 
-// --- Helper Function (Copied from GitlabClient) ---
 // TODO: Move this to a shared utility module?
 function removeDuplicateCommands(commands: MemoItem[]): MemoItem[] {
   const idMap = new Map<string, MemoItem>();

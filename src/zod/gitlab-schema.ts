@@ -1,7 +1,7 @@
 /** @format */
 
 import { z } from "zod";
-import { CommandsStructureSchema } from "./command-schema"; // Assuming command-schema.ts will be the final name
+import { CommandsStructureSchema } from "./command-schema";
 
 export const GitLabFileContentSchema = z.object({
   file_name: z.string(),

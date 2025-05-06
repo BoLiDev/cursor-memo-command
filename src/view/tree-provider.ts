@@ -7,7 +7,6 @@ import { CloudStoreService } from "../services/cloud-store-service";
 import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
 import { MemoTreeViewModel } from "./view-model";
 
-// 重新导出树项类型，以便其他模块可以访问
 export { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
 
 /**
@@ -60,15 +59,12 @@ export class MemoTreeDataProvider
       this.cloudStoreService
     );
 
-    // Listen to ViewModel updates to refresh the tree
     this.viewModelListener = this.viewModel.onDidViewModelUpdate(() => {
       console.log(
         "TreeProvider: Received view model update, firing tree data change."
       );
       this._onDidChangeTreeData.fire();
     });
-
-    // Initial data is loaded by the ViewModel constructor and the event fires automatically
   }
 
   /**
@@ -92,11 +88,9 @@ export class MemoTreeDataProvider
       element instanceof CategoryGroupTreeItem ||
       element instanceof CategoryTreeItem
     ) {
-      // CategoryGroupTreeItem and CategoryTreeItem already are TreeItems
       return element;
     }
 
-    // Handle MemoItem
     const displayName = element.alias || element.label;
     const treeItem = new vscode.TreeItem(
       displayName,
@@ -104,17 +98,15 @@ export class MemoTreeDataProvider
     );
 
     treeItem.description = new Date(element.timestamp).toLocaleString();
-    // Always use the 'note' icon for command items, regardless of local/cloud
     treeItem.iconPath = new vscode.ThemeIcon("note");
     treeItem.tooltip = element.command;
-    // Context value still distinguishes between local and cloud items
     treeItem.contextValue = element.isCloud ? "cloudMemoItem" : "memoItem";
 
     if (this.commandCallback) {
       treeItem.command = {
         command: this.commandCallback,
         title: "Execute Command",
-        arguments: [element], // Pass the MemoItem itself
+        arguments: [element],
       };
     }
 
@@ -131,29 +123,24 @@ export class MemoTreeDataProvider
     element?: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
   ): (CategoryGroupTreeItem | CategoryTreeItem | MemoItem)[] {
     if (!element) {
-      // --- Root Level: Return "Local" and "Cloud" group nodes ---
       const groups: CategoryGroupTreeItem[] = [];
       groups.push(this.viewModel.getLocalGroupNode());
-      // Always show Cloud group, even if empty, to allow sync
       groups.push(this.viewModel.getCloudGroupNode());
       return groups;
     }
 
     if (element instanceof CategoryGroupTreeItem) {
-      // --- Second Level: Return Categories under "Local" or "Cloud" ---
       return element.isCloud
         ? this.viewModel.getSortedCloudCategories()
         : this.viewModel.getSortedLocalCategories();
     }
 
     if (element instanceof CategoryTreeItem) {
-      // --- Third Level: Return MemoItems under a specific category ---
       return element.isCloud
         ? this.viewModel.getCloudCategoryItems(element.category.id)
         : this.viewModel.getLocalCategoryItems(element.category.id);
     }
 
-    // MemoItems have no children
     return [];
   }
 
@@ -169,18 +156,15 @@ export class MemoTreeDataProvider
     CategoryGroupTreeItem | CategoryTreeItem | MemoItem
   > {
     if (element instanceof CategoryGroupTreeItem) {
-      // Group nodes are root level
       return null;
     }
 
     if (element instanceof CategoryTreeItem) {
-      // Category nodes' parent is the corresponding group node
       return element.isCloud
         ? this.viewModel.getCloudGroupNode()
         : this.viewModel.getLocalGroupNode();
     }
 
-    // MemoItem's parent is its category node (local or cloud)
     return this.viewModel.getCategoryNodeForItem(element);
   }
 
@@ -189,7 +173,7 @@ export class MemoTreeDataProvider
    */
   public dispose(): void {
     this.viewModelListener?.dispose();
-    this.viewModel.dispose(); // Dispose the view model as well
+    this.viewModel.dispose();
     this._onDidChangeTreeData.dispose();
   }
 }

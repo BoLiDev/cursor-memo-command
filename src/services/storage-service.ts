@@ -8,8 +8,6 @@ import * as vscode from "vscode";
 export class StorageService {
   constructor(private context: vscode.ExtensionContext) {}
 
-  // --- Global State Methods ---
-
   /**
    * Retrieve a value from global state storage.
    * @param key The key of the value to retrieve.
@@ -29,8 +27,6 @@ export class StorageService {
   public async setValue<T>(key: string, value: T): Promise<void> {
     await this.context.globalState.update(key, value);
   }
-
-  // --- Secret Storage Methods ---
 
   /**
    * Retrieve a secret from secure storage.

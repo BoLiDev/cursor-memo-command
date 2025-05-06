@@ -22,7 +22,6 @@ export class MemoTreeViewModel {
   private localGroupNode: CategoryGroupTreeItem;
   private cloudGroupNode: CategoryGroupTreeItem;
 
-  // --- Event Emitter for ViewModel Updates ---
   private _onDidViewModelUpdate = new vscode.EventEmitter<void>();
   readonly onDidViewModelUpdate: vscode.Event<void> =
     this._onDidViewModelUpdate.event;
@@ -42,15 +41,14 @@ export class MemoTreeViewModel {
     this.localGroupNode = new CategoryGroupTreeItem(
       "Local",
       vscode.TreeItemCollapsibleState.Expanded,
-      false // isCloud = false
+      false
     );
     this.cloudGroupNode = new CategoryGroupTreeItem(
       "Cloud",
       vscode.TreeItemCollapsibleState.Expanded,
-      true // isCloud = true
+      true
     );
 
-    // --- Subscribe to Service Events ---
     this.disposables.push(
       this.localDataService.onDidCommandsChange(() => {
         console.log("ViewModel: Received local commands change event.");
@@ -66,7 +64,7 @@ export class MemoTreeViewModel {
       })
     );
 
-    this.update(); // Initial data load
+    this.update();
   }
 
   /**
@@ -90,7 +88,6 @@ export class MemoTreeViewModel {
     // Rebuild category nodes
     this.rebuildCategoryNodes();
     console.log("ViewModel: Data updated, firing event.");
-    // --- Fire ViewModel Update Event ---
     this._onDidViewModelUpdate.fire();
   }
 
@@ -107,7 +104,6 @@ export class MemoTreeViewModel {
    * @returns True if local data exists, false otherwise.
    */
   public hasLocalData(): boolean {
-    // Check if there are commands or non-default categories
     const hasNonDefaultCategories = this.localCategories.some(
       (cat) => cat.id !== this.localDataService.getDefaultCategoryId()
     );
@@ -121,7 +117,6 @@ export class MemoTreeViewModel {
     this.localCategoryNodes.clear();
     this.cloudCategoryNodes.clear();
 
-    // --- Create Local Category Nodes ---
     this.localCategories.forEach((category) => {
       const items = this.getLocalCategoryItems(category.id);
       const collapsibleState =
@@ -134,7 +129,6 @@ export class MemoTreeViewModel {
       );
     });
 
-    // --- Create Cloud Category Nodes ---
     this.cloudCategoriesSet.forEach((catId) => {
       const items = this.getCloudCategoryItems(catId);
 
@@ -184,8 +178,6 @@ export class MemoTreeViewModel {
     );
   }
 
-  // --- Getters for TreeDataProvider ---
-
   public getLocalGroupNode(): CategoryGroupTreeItem {
     return this.localGroupNode;
   }
@@ -202,7 +194,6 @@ export class MemoTreeViewModel {
 
   public getSortedCloudCategories(): CategoryTreeItem[] {
     const cloudCats = Array.from(this.cloudCategoryNodes.values())
-      // Filter logic refined: only show cloud 'Default' if it has items or doesn't exist locally
       .filter((node) => {
         const isDefault =
           node.category.id === this.localDataService.getDefaultCategoryId();
@@ -211,9 +202,9 @@ export class MemoTreeViewModel {
           this.getCloudCategoryItems(node.category.id).length > 0;
 
         if (isDefault && existsLocally) {
-          return hasCloudItems; // Only show cloud 'Default' if it has items when it also exists locally
+          return hasCloudItems;
         }
-        return true; // Show other cloud categories
+        return true;
       })
       .sort((a, b) => a.category.name.localeCompare(b.category.name));
     return cloudCats;

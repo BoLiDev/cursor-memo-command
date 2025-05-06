@@ -5,15 +5,12 @@ import { LocalMemoService } from "../services/local-data-service";
 import { MemoItem } from "../models/memo-item";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
-// Temporary: Define directPaste here until it's properly handled/moved
-// TODO: Move directPaste to a suitable utility or integrate into UIService
+// TODO: Move directPaste to a suitable utility
 async function directPaste(): Promise<void> {
   try {
     await vscode.commands.executeCommand("editor.action.clipboardPasteAction");
   } catch (error) {
-    // Use uiService for warnings in the future if needed
     console.error("Direct paste error:", error);
-    // Potentially: await uiService.showWarningMessage("Could not paste directly...");
   }
 }
 

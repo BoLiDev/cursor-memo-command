@@ -1,6 +1,6 @@
 /** @format */
 
-import * as vscode from "vscode"; // Import vscode for EventEmitter
+import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
 import { Category } from "../models/category";
 import { StorageService } from "./storage-service";
@@ -17,7 +17,6 @@ export class LocalMemoService {
   private categories: Category[] = [];
   private initialized: boolean = false;
 
-  // --- Event Emitters ---
   private _onDidCommandsChange = new vscode.EventEmitter<void>();
   readonly onDidCommandsChange: vscode.Event<void> =
     this._onDidCommandsChange.event;

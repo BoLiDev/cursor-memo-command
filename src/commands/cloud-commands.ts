@@ -1,10 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import {
-  CloudStoreService,
-  CloudOperationResult,
-} from "../services/cloud-store-service";
+import { CloudStoreService } from "../services/cloud-store-service";
 import { CategoryTreeItem } from "../view/tree-items";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
