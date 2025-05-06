@@ -8,11 +8,11 @@ import { VSCodeUserInteractionService } from "../services/vscode-user-interactio
 import { QuickPickItem } from "vscode";
 
 /**
- * Creates a "Push to GitLab" command handler
+ * Creates a "Push to GitLab" handler
  * @param cloudStoreService Service managing cloud state and push operations
  * @param localMemoService Local memo service
  * @param uiService The user interaction service
- * @returns "Push to GitLab" command handler
+ * @returns "Push to GitLab" handler
  */
 export function createPushToGitLabHandler(
   cloudStoreService: CloudService,

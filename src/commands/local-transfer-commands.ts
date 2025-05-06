@@ -9,12 +9,12 @@ import { VSCodeUserInteractionService } from "../services/vscode-user-interactio
 import { QuickPickItem } from "vscode";
 
 /**
- * Creates the export commands handler
+ * Creates the export prompts handler
  * @param dataService The local memo data service
  * @param uiService The user interaction service
- * @returns The export commands handler function
+ * @returns The export prompts handler function
  */
-export function createExportCommandsHandler(
+export function createExportPromptsHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
@@ -76,12 +76,12 @@ export function createExportCommandsHandler(
 }
 
 /**
- * Creates the import commands handler
+ * Creates the import prompts handler
  * @param dataService The local memo data service
  * @param uiService The user interaction service
- * @returns The import commands handler function
+ * @returns The import prompts handler function
  */
-export function createImportCommandsHandler(
+export function createImportPromptsHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {

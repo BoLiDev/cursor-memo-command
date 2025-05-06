@@ -21,13 +21,13 @@
   "contributes": {
     "commands": [
       {
-        "command": "cursor-memo.saveCommand",
+        "command": "cursor-memo.savePrompt",
         "title": "Save Current Command",
         "category": "Cursor Memo",
         "icon": "$(add)"
       },
       {
-        "command": "cursor-memo.removeCommand",
+        "command": "cursor-memo.removePrompt",
         "title": "Delete",
         "category": "Cursor Memo"
       },
@@ -37,12 +37,12 @@
         "category": "Cursor Memo"
       },
       {
-        "command": "cursor-memo.renameCommand",
+        "command": "cursor-memo.renamePrompt",
         "title": "Rename",
         "category": "Cursor Memo"
       },
       {
-        "command": "cursor-memo.editCommand",
+        "command": "cursor-memo.editPrompt",
         "title": "Edit",
         "category": "Cursor Memo"
       },
@@ -73,19 +73,19 @@
         "category": "Cursor Memo"
       },
       {
-        "command": "cursor-memo.addCommandToCategory",
+        "command": "cursor-memo.addPromptToCategory",
         "title": "Add Command to this Category",
         "category": "Cursor Memo",
         "icon": "$(add)"
       },
       {
-        "command": "cursor-memo.exportCommands",
+        "command": "cursor-memo.exportPrompts",
         "title": "Export Commands",
         "category": "Cursor Memo",
         "icon": "$(arrow-down)"
       },
       {
-        "command": "cursor-memo.importCommands",
+        "command": "cursor-memo.importPrompts",
         "title": "Import Commands",
         "category": "Cursor Memo",
         "icon": "$(arrow-up)"
@@ -131,12 +131,12 @@
           "group": "inline@2"
         },
         {
-          "command": "cursor-memo.importCommands",
+          "command": "cursor-memo.importPrompts",
           "when": "view == cursorMemoPanel && viewItem == localGroup",
           "group": "inline@3"
         },
         {
-          "command": "cursor-memo.exportCommands",
+          "command": "cursor-memo.exportPrompts",
           "when": "view == cursorMemoPanel && viewItem == localGroup",
           "group": "inline@4"
         },
@@ -156,17 +156,17 @@
           "group": "inline@2"
         },
         {
-          "command": "cursor-memo.renameCommand",
+          "command": "cursor-memo.renamePrompt",
           "when": "view == cursorMemoPanel && viewItem == memoItem",
           "group": "1_modification@1"
         },
         {
-          "command": "cursor-memo.editCommand",
+          "command": "cursor-memo.editPrompt",
           "when": "view == cursorMemoPanel && viewItem == memoItem",
           "group": "1_modification@2"
         },
         {
-          "command": "cursor-memo.removeCommand",
+          "command": "cursor-memo.removePrompt",
           "when": "view == cursorMemoPanel && viewItem == memoItem",
           "group": "1_modification@3"
         },
@@ -191,7 +191,7 @@
           "group": "1_modification@1"
         },
         {
-          "command": "cursor-memo.addCommandToCategory",
+          "command": "cursor-memo.addPromptToCategory",
           "when": "view == cursorMemoPanel && viewItem == category",
           "group": "inline"
         }

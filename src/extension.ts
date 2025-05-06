@@ -22,11 +22,11 @@ import {
   createManageGitLabTokenHandler,
 } from "./commands/cloud-commands";
 import {
-  createSaveCommandHandler,
-  createRemoveCommandHandler,
-  createRenameCommandHandler,
+  createSavePromptHandler,
+  createRemovePromptHandler,
+  createRenamePromptHandler,
   createPasteToEditorHandler,
-  createEditCommandHandler,
+  createEditPromptHandler,
 } from "./commands/local-commands";
 import {
   createAddCategoryHandler,
@@ -36,8 +36,8 @@ import {
   createAddPromptToCategoryHandler,
 } from "./commands/category-commands";
 import {
-  createExportCommandsHandler,
-  createImportCommandsHandler,
+  createExportPromptsHandler,
+  createImportPromptsHandler,
 } from "./commands/local-transfer-commands";
 import { createPushToGitLabHandler } from "./commands/cloud-push-command";
 
@@ -90,20 +90,20 @@ export async function activate(context: vscode.ExtensionContext) {
   // Register Commands
   const commands: { [key: string]: (...args: any[]) => Promise<void> } = {
     // Local Commands
-    "cursor-memo.saveCommand": createSaveCommandHandler(
+    "cursor-memo.savePrompt": createSavePromptHandler(
       localMemoService,
       uiService
     ),
-    "cursor-memo.removeCommand": createRemoveCommandHandler(
+    "cursor-memo.removePrompt": createRemovePromptHandler(
       localMemoService,
       uiService
     ),
-    "cursor-memo.renameCommand": createRenameCommandHandler(
+    "cursor-memo.renamePrompt": createRenamePromptHandler(
       localMemoService,
       uiService
     ),
     "cursor-memo.pasteToEditor": createPasteToEditorHandler(uiService),
-    "cursor-memo.editCommand": createEditCommandHandler(
+    "cursor-memo.editPrompt": createEditPromptHandler(
       localMemoService,
       uiService
     ),
@@ -125,7 +125,7 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-    "cursor-memo.addCommandToCategory": createAddPromptToCategoryHandler(
+    "cursor-memo.addPromptToCategory": createAddPromptToCategoryHandler(
       localMemoService,
       uiService
     ),
@@ -150,11 +150,11 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
 
     // Data Transfer Commands
-    "cursor-memo.exportCommands": createExportCommandsHandler(
+    "cursor-memo.exportPrompts": createExportPromptsHandler(
       localMemoService,
       uiService
     ),
-    "cursor-memo.importCommands": createImportCommandsHandler(
+    "cursor-memo.importPrompts": createImportPromptsHandler(
       localMemoService,
       uiService
     ),

@@ -15,12 +15,12 @@ async function directPaste(): Promise<void> {
 }
 
 /**
- * Creates the save command handler
+ * Creates the save prompt handler
  * @param dataService The local memo data service
  * @param uiService The user interaction service
- * @returns The save command handler function
+ * @returns The save prompt handler function
  */
-export function createSaveCommandHandler(
+export function createSavePromptHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
@@ -51,11 +51,11 @@ export function createSaveCommandHandler(
 }
 
 /**
- * Creates the remove command handler
+ * Creates the remove prompt handler
  * @param dataService The local memo data service
- * @returns The remove command handler function
+ * @returns The remove prompt handler function
  */
-export function createRemoveCommandHandler(
+export function createRemovePromptHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
@@ -73,12 +73,12 @@ export function createRemoveCommandHandler(
 }
 
 /**
- * Creates the rename command handler
+ * Creates the rename prompt handler
  * @param dataService The local memo data service
  * @param uiService The user interaction service
- * @returns The rename command handler function
+ * @returns The rename prompt handler function
  */
-export function createRenameCommandHandler(
+export function createRenamePromptHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
@@ -121,12 +121,12 @@ export function createPasteToEditorHandler(
 }
 
 /**
- * Creates the edit command handler
+ * Creates the edit prompt handler
  * @param dataService The local memo data service
  * @param uiService The user interaction service
- * @returns The edit command handler function
+ * @returns The edit prompt handler function
  */
-export function createEditCommandHandler(
+export function createEditPromptHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
