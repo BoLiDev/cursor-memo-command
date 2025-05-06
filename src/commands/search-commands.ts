@@ -34,7 +34,7 @@ export function createSearchAllPromptsHandler(
       const categoryName =
         localCategoryMap.get(prompt.categoryId) || "Unknown Category";
       quickPickItems.push({
-        label: `$(library) ${prompt.alias || prompt.label} (${categoryName}) - Local`,
+        label: `$(library) [${categoryName}] ${prompt.alias || prompt.label}`,
         description:
           prompt.content.substring(0, 100) +
           (prompt.content.length > 100 ? "..." : ""),
@@ -48,7 +48,7 @@ export function createSearchAllPromptsHandler(
       // For cloud prompts, categoryId is the category name itself
       const categoryName = prompt.categoryId || "Unknown Category";
       quickPickItems.push({
-        label: `$(cloud) ${prompt.alias || prompt.label} (${categoryName}) - Cloud`,
+        label: `$(cloud) [${categoryName}] ${prompt.alias || prompt.label}`,
         description:
           prompt.content.substring(0, 100) +
           (prompt.content.length > 100 ? "..." : ""),

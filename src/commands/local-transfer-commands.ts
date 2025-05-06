@@ -7,6 +7,7 @@ import { LocalTransferService } from "../services/local-transfer-service";
 import { parsePrompts } from "../zod/prompt-schema";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 import { QuickPickItem } from "vscode";
+import { Prompt } from "../models/prompt";
 
 /**
  * Creates the export prompts handler
@@ -28,37 +29,42 @@ export function createExportPromptsHandler(
       return;
     }
 
-    // Filter out categories that have no prompts
-    const nonEmtpyCategories = categories.filter((category) =>
-      prompts.some((prompt) => prompt.categoryId === category.id)
-    );
+    // Define type for QuickPick items that hold Prompt data
+    type PromptQuickPickItem = QuickPickItem & { prompt: Prompt };
 
-    // Provide options to export selected categories or all
-    const options: QuickPickItem[] = nonEmtpyCategories.map((cat) => ({
-      label: cat.name,
-      description:
-        cat.id === dataService.getDefaultCategoryId()
-          ? `(${LocalService.DEFAULT_CATEGORY})`
-          : "",
-    }));
+    // Prepare quick pick items from all local prompts
+    const categoryMap = new Map(categories.map((cat) => [cat.id, cat.name]));
 
-    const selectedQuickPickItems = await uiService.showQuickPick(options, {
-      placeHolder: "Select categories to export",
-      canPickMany: true,
+    const quickPickItems: PromptQuickPickItem[] = prompts.map((prompt) => {
+      const categoryName =
+        categoryMap.get(prompt.categoryId) || "Unknown Category";
+      return {
+        label: `$(library) [${categoryName}] ${prompt.alias || prompt.label}`,
+        description:
+          prompt.content.length > 60
+            ? `${prompt.content.substring(0, 60)}...`
+            : prompt.content,
+        prompt: prompt,
+      };
     });
 
-    if (!selectedQuickPickItems || selectedQuickPickItems.length === 0) {
+    const selectedItems = await uiService.showQuickPick(quickPickItems, {
+      placeHolder: "Select prompts to export",
+      canPickMany: true,
+      matchOnDescription: true,
+      matchOnDetail: true,
+    });
+
+    if (!selectedItems || selectedItems.length === 0) {
       return;
     }
 
-    const selectedCategoryIds = selectedQuickPickItems.map(
-      (item) => item.label
-    );
+    // Extract the selected prompts
+    const promptsToExport = selectedItems.map((item) => item.prompt);
 
-    let exportData: string;
-    // Export only selected categories
-    exportData =
-      dataTransferService.exportSelectedCategories(selectedCategoryIds);
+    // Export selected prompts
+    const exportData =
+      dataTransferService.exportSelectedPrompts(promptsToExport);
 
     const saveDialogOptions: vscode.SaveDialogOptions = {
       defaultUri: vscode.Uri.file("cursor_prompts.json"),

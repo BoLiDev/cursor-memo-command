@@ -46,6 +46,20 @@ export class LocalTransferService {
   }
 
   /**
+   * Export selected prompts as JSON string using the human-friendly format
+   * @param selectedPrompts Array of prompt items to export
+   * @returns JSON string of selected prompts organized by category and alias
+   */
+  public exportSelectedPrompts(selectedPrompts: Prompt[]): string {
+    const categories = this.localService.getCategories();
+    const promptsData = this._transformMemoItemsToExportStructure(
+      selectedPrompts,
+      categories
+    );
+    return serializePrompts(promptsData);
+  }
+
+  /**
    * Import data from JSON string
    * @param jsonData JSON string of prompts data in the new format
    * @returns Promise with result of import operation

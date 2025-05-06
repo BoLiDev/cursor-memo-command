@@ -82,13 +82,13 @@
         "command": "cursor-memo.exportPrompts",
         "title": "Export Commands",
         "category": "Cursor Memo",
-        "icon": "$(arrow-down)"
+        "icon": "$(arrow-up)"
       },
       {
         "command": "cursor-memo.importPrompts",
         "title": "Import Commands",
         "category": "Cursor Memo",
-        "icon": "$(arrow-up)"
+        "icon": "$(arrow-down)"
       },
       {
         "command": "cursor-memo.syncFromGitLab",

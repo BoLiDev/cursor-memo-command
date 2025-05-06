@@ -32,7 +32,6 @@ export function createPushToGitLabHandler(
     // Define type for QuickPick items that hold MemoItem data
     type MemoQuickPickItem = QuickPickItem & {
       prompt?: Prompt;
-      isSeparator?: boolean;
     };
 
     // Group prompts by category for display
@@ -60,23 +59,16 @@ export function createPushToGitLabHandler(
 
     sortedCategoryIds.forEach((categoryId) => {
       const categoryName = categoryMap.get(categoryId) || categoryId;
-      // Add category title as a separator
-      quickPickItems.push({
-        label: `$(folder) ${categoryName}`,
-        kind: vscode.QuickPickItemKind.Separator,
-        isSeparator: true,
-      });
 
       // Add all prompts in this category
       promptsByCategory[categoryId].forEach((prompt) => {
         quickPickItems.push({
-          label: `$(terminal) ${prompt.alias || prompt.label}`,
-          description: categoryName,
-          detail:
+          label: `$(library) [${categoryName}] ${prompt.alias || prompt.label}`,
+          description:
             prompt.content.length > 60
               ? `${prompt.content.substring(0, 60)}...`
               : prompt.content,
-          prompt: prompt,
+          prompt,
         });
       });
     });
@@ -95,8 +87,7 @@ export function createPushToGitLabHandler(
     // Filter out separator items and only keep actual prompt items
     const promptsToUpload = selectedItems
       .filter(
-        (item): item is MemoQuickPickItem & { prompt: Prompt } =>
-          !item.isSeparator && !!item.prompt
+        (item): item is MemoQuickPickItem & { prompt: Prompt } => !!item.prompt
       )
       .map((item) => item.prompt);
 
