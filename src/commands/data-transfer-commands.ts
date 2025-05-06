@@ -25,8 +25,7 @@ export function createExportCommandsHandler(
     }
 
     // Provide options to export selected categories or all
-    const allOption = "All categories";
-    const options = [allOption, ...categories];
+    const options = categories;
 
     const selectedOption = await vscode.window.showQuickPick(options, {
       placeHolder: "Select categories to export",
@@ -38,13 +37,8 @@ export function createExportCommandsHandler(
     }
 
     let exportData: string;
-    if (selectedOption.includes(allOption)) {
-      // Export all categories
-      exportData = dataTransferService.exportData();
-    } else {
-      // Export only selected categories
-      exportData = dataTransferService.exportSelectedCategories(selectedOption);
-    }
+    // Export only selected categories
+    exportData = dataTransferService.exportSelectedCategories(selectedOption);
 
     const saveDialogOptions: vscode.SaveDialogOptions = {
       defaultUri: vscode.Uri.file("cursor_commands.json"),
@@ -126,8 +120,7 @@ export function createImportCommandsHandler(
           }
 
           // Provide options to import selected categories or all
-          const allOption = "All categories";
-          const options = [allOption, ...categories];
+          const options = categories;
 
           const selectedOption = await vscode.window.showQuickPick(options, {
             placeHolder: "Select categories to import",
@@ -138,22 +131,13 @@ export function createImportCommandsHandler(
             return;
           }
 
-          if (selectedOption.includes(allOption)) {
-            // Import all categories
-            await importAllData(
-              fileContents,
-              dataTransferService,
-              memoTreeProvider
-            );
-          } else {
-            // Import only selected categories
-            await importSelectedData(
-              fileContents,
-              selectedOption,
-              dataTransferService,
-              memoTreeProvider
-            );
-          }
+          // Import only selected categories
+          await importSelectedData(
+            fileContents,
+            selectedOption,
+            dataTransferService,
+            memoTreeProvider
+          );
         } catch (parseError) {
           vscode.window.showErrorMessage(`Invalid JSON file: ${parseError}`);
         }

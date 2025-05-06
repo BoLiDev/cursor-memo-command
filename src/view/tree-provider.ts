@@ -132,9 +132,7 @@ export class MemoTreeDataProvider
     if (!element) {
       // --- Root Level: Return "Local" and "Cloud" group nodes ---
       const groups: CategoryGroupTreeItem[] = [];
-      if (this.viewModel.hasLocalData()) {
-        groups.push(this.viewModel.getLocalGroupNode());
-      }
+      groups.push(this.viewModel.getLocalGroupNode());
       // Always show Cloud group, even if empty, to allow sync
       groups.push(this.viewModel.getCloudGroupNode());
       return groups;

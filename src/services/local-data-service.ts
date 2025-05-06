@@ -9,7 +9,7 @@ import { MemoItem } from "../models/memo-item";
 export class LocalMemoService {
   private static STORAGE_KEY = "cursor-memo-commands";
   private static CATEGORIES_KEY = "cursor-memo-categories";
-  private static DEFAULT_CATEGORY = "default";
+  private static DEFAULT_CATEGORY = "Default";
 
   private commands: MemoItem[] = [];
   private categories: string[] = [];

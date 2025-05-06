@@ -2,9 +2,16 @@
 
 import * as vscode from "vscode";
 import fetch, { Response } from "node-fetch";
+import * as os from "os";
 import { z } from "zod";
 import { MemoItemSchema, GitLabFileContentSchema } from "../zod/gitlab";
+import {
+  GitLabBranchResponseSchema,
+  GitLabMergeRequestResponseSchema,
+  GitLabFileCommitResponseSchema,
+} from "../zod/gitlab-mr";
 import { MemoItem } from "../models/memo-item";
+import { LocalMemoService } from "./local-data-service";
 
 // Schema for the structure inside the decoded GitLab file content
 const teamCommandsSchema = z.object({
@@ -19,7 +26,7 @@ const teamCommandsSchema = z.object({
 export class GitlabClient {
   private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
-  private static DEFAULT_CATEGORY = "default";
+  private static DEFAULT_CATEGORY = "Default";
 
   private domain: string;
   private projectId: string;
@@ -326,6 +333,38 @@ export class GitlabClient {
   }
 
   /**
+   * Fetch all available categories from GitLab.
+   */
+  public async fetchAvailableCategories(): Promise<string[]> {
+    const fetchResult = await this.fetchTeamCommands();
+
+    if (!fetchResult.success || !fetchResult.data) {
+      throw new Error(
+        fetchResult.error || "Failed to fetch or parse data from GitLab"
+      );
+    }
+
+    // Get categories explicitly defined in the file
+    const explicitCategories = fetchResult.data.categories || [];
+
+    // Also collect all categories used in individual commands
+    const commandCategories = new Set<string>();
+    const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
+
+    allImportedCommands.forEach((cmd) => {
+      const category = cmd.category || GitlabClient.DEFAULT_CATEGORY;
+      commandCategories.add(category);
+    });
+
+    // Combine both sources of categories
+    const allCategories = [
+      ...new Set([...explicitCategories, ...commandCategories]),
+    ];
+
+    return allCategories;
+  }
+
+  /**
    * Remove cloud category from local storage.
    */
   public async removeCloudCategory(categoryName: string): Promise<{
@@ -368,6 +407,403 @@ export class GitlabClient {
       ...cmd,
       isCloud: true,
     }));
+  }
+
+  /**
+   * 创建新分支
+   * @param token GitLab 访问令牌
+   * @param branchName 新分支名称
+   * @param refBranch 参考分支名称
+   * @returns 创建结果
+   */
+  private async createBranch(
+    token: string,
+    branchName: string,
+    refBranch: string = this.branch
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    if (!this.projectId) {
+      return { success: false, error: "GitLab Project ID not configured." };
+    }
+
+    const encodedProjectId = encodeURIComponent(this.projectId);
+    const url = `${this.domain}/projects/${encodedProjectId}/repository/branches`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "User-Agent": "VSCode Cursor Memo Extension",
+        },
+        body: JSON.stringify({
+          branch: branchName,
+          ref: refBranch,
+        }),
+      });
+
+      if (!response.ok) {
+        await handleGitLabError(response);
+      }
+
+      const data = await response.json();
+      const validationResult = GitLabBranchResponseSchema.safeParse(data);
+
+      if (!validationResult.success) {
+        console.error(
+          "Branch creation response validation failed:",
+          validationResult.error.errors
+        );
+        return {
+          success: false,
+          error: "Invalid branch creation response format",
+        };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Error creating branch in GitLab: ${error}`);
+      return {
+        success: false,
+        error: error.message || "Unknown error creating branch",
+      };
+    }
+  }
+
+  /**
+   * 提交文件修改
+   * @param token GitLab 访问令牌
+   * @param branchName 目标分支
+   * @param filePath 文件路径
+   * @param content 文件内容
+   * @param commitMessage 提交信息
+   * @returns 提交结果
+   */
+  private async commitFileChange(
+    token: string,
+    branchName: string,
+    filePath: string,
+    content: string,
+    commitMessage: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    if (!this.projectId) {
+      return { success: false, error: "GitLab Project ID not configured." };
+    }
+
+    const encodedProjectId = encodeURIComponent(this.projectId);
+    const encodedFilePath = encodeURIComponent(filePath);
+    const url = `${this.domain}/projects/${encodedProjectId}/repository/files/${encodedFilePath}`;
+
+    try {
+      // 检查文件是否存在
+      let method = "POST"; // 默认是创建
+
+      try {
+        const checkResponse = await fetch(
+          `${url}?ref=${encodeURIComponent(branchName)}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "User-Agent": "VSCode Cursor Memo Extension",
+            },
+          }
+        );
+
+        if (checkResponse.ok) {
+          method = "PUT"; // 文件存在，使用PUT更新
+        }
+      } catch (error) {
+        // 文件不存在，使用POST创建
+        method = "POST";
+      }
+
+      // 提交文件
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "User-Agent": "VSCode Cursor Memo Extension",
+        },
+        body: JSON.stringify({
+          branch: branchName,
+          content: Buffer.from(content).toString("base64"),
+          encoding: "base64",
+          commit_message: commitMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        await handleGitLabError(response);
+      }
+
+      const data = await response.json();
+      const validationResult = GitLabFileCommitResponseSchema.safeParse(data);
+
+      if (!validationResult.success) {
+        console.error(
+          "File commit response validation failed:",
+          validationResult.error.errors
+        );
+        return {
+          success: false,
+          error: "Invalid file commit response format",
+        };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Error committing file to GitLab: ${error}`);
+      return {
+        success: false,
+        error: error.message || "Unknown error committing file",
+      };
+    }
+  }
+
+  /**
+   * 创建合并请求
+   * @param token GitLab 访问令牌
+   * @param sourceBranch 源分支名称
+   * @param targetBranch 目标分支名称
+   * @param title 合并请求标题
+   * @param description 合并请求描述
+   * @returns 创建结果，包含合并请求URL
+   */
+  private async createMergeRequest(
+    token: string,
+    sourceBranch: string,
+    targetBranch: string,
+    title: string,
+    description: string
+  ): Promise<{
+    success: boolean;
+    mergeRequestUrl?: string;
+    error?: string;
+  }> {
+    if (!this.projectId) {
+      return { success: false, error: "GitLab Project ID not configured." };
+    }
+
+    const encodedProjectId = encodeURIComponent(this.projectId);
+    const url = `${this.domain}/projects/${encodedProjectId}/merge_requests`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "User-Agent": "VSCode Cursor Memo Extension",
+        },
+        body: JSON.stringify({
+          source_branch: sourceBranch,
+          target_branch: targetBranch,
+          title,
+          description,
+          remove_source_branch: true, // 可选: 合并后删除源分支
+        }),
+      });
+
+      if (!response.ok) {
+        await handleGitLabError(response);
+      }
+
+      const data = await response.json();
+      const validationResult = GitLabMergeRequestResponseSchema.safeParse(data);
+
+      if (!validationResult.success) {
+        console.error(
+          "Merge request creation response validation failed:",
+          validationResult.error.errors
+        );
+        return {
+          success: false,
+          error: "Invalid merge request creation response format",
+        };
+      }
+
+      return {
+        success: true,
+        mergeRequestUrl: validationResult.data.web_url,
+      };
+    } catch (error: any) {
+      console.error(`Error creating merge request in GitLab: ${error}`);
+      return {
+        success: false,
+        error: error.message || "Unknown error creating merge request",
+      };
+    }
+  }
+
+  /**
+   * 将本地选定的 prompt 推送到 GitLab 仓库（通过创建合并请求）
+   * @param selectedCategories 选定的本地分类名称数组
+   * @param localMemoService 本地 memo 服务
+   * @returns 推送结果
+   */
+  public async pushSelectedToGitLab(
+    selectedCategories: string[],
+    localMemoService: LocalMemoService
+  ): Promise<{
+    success: boolean;
+    mergeRequestUrl?: string;
+    pushedCommands: number;
+    error?: string;
+  }> {
+    try {
+      // 1. 获取 GitLab 访问令牌
+      const token = await this.getToken();
+      if (!token) {
+        return {
+          success: false,
+          pushedCommands: 0,
+          error: "GitLab token not provided.",
+        };
+      }
+
+      // 2. 获取要推送的本地命令
+      const localCommands = localMemoService
+        .getCommands()
+        .filter((cmd) => selectedCategories.includes(cmd.category));
+
+      if (localCommands.length === 0) {
+        return {
+          success: false,
+          pushedCommands: 0,
+          error: "No commands selected for pushing.",
+        };
+      }
+
+      // 3. 获取远程文件内容
+      const fetchResult = await this.fetchTeamCommands();
+      if (!fetchResult.success) {
+        return {
+          success: false,
+          pushedCommands: 0,
+          error: fetchResult.error || "Failed to fetch remote file.",
+        };
+      }
+
+      // 4. 合并本地和远程命令
+      const remoteCommands = fetchResult.data?.commands || [];
+      const remoteCategories = fetchResult.data?.categories || [];
+
+      // 创建合并后的命令和类别集
+      const mergedCommands = [...remoteCommands];
+      const mergedCategories = new Set(remoteCategories);
+
+      // 添加本地命令到合并列表
+      let newCommandsCount = 0;
+
+      for (const localCommand of localCommands) {
+        // 去掉本地属性，准备推送
+        const commandToAdd = {
+          id: localCommand.id.includes("_imported_")
+            ? localCommand.id.split("_imported_")[0]
+            : localCommand.id,
+          label: localCommand.label,
+          command: localCommand.command,
+          timestamp: localCommand.timestamp,
+          category: localCommand.category,
+          alias: localCommand.alias,
+        };
+
+        // 检查是否存在同ID命令
+        const existingIndex = mergedCommands.findIndex(
+          (cmd) => cmd.id === commandToAdd.id
+        );
+
+        if (existingIndex >= 0) {
+          // 更新现有命令
+          mergedCommands[existingIndex] = commandToAdd;
+        } else {
+          // 添加新命令
+          mergedCommands.push(commandToAdd);
+          newCommandsCount++;
+        }
+
+        // 添加类别
+        mergedCategories.add(localCommand.category);
+      }
+
+      // 5. 准备新的文件内容
+      const newFileContent = JSON.stringify(
+        {
+          commands: mergedCommands,
+          categories: Array.from(mergedCategories),
+        },
+        null,
+        2
+      );
+
+      // 6. 创建新分支
+      const timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
+      const branchName = `cursor_memo_update_${timestamp}`;
+
+      const branchResult = await this.createBranch(token, branchName);
+      if (!branchResult.success) {
+        return {
+          success: false,
+          pushedCommands: 0,
+          error: branchResult.error || "Failed to create branch.",
+        };
+      }
+
+      // 7. 提交文件
+      const commitResult = await this.commitFileChange(
+        token,
+        branchName,
+        this.filePath,
+        newFileContent,
+        `Update prompt commands: added ${newCommandsCount} new commands, updated ${localCommands.length - newCommandsCount} commands.`
+      );
+
+      if (!commitResult.success) {
+        return {
+          success: false,
+          pushedCommands: 0,
+          error: commitResult.error || "Failed to commit file.",
+        };
+      }
+
+      // 8. 创建合并请求
+      const mrResult = await this.createMergeRequest(
+        token,
+        branchName,
+        this.branch, // 目标分支是配置的主分支
+        `Update prompt commands from ${os.hostname() || "local"}`,
+        `This merge request adds ${newCommandsCount} new commands and updates ${localCommands.length - newCommandsCount} existing commands in categories: ${selectedCategories.join(", ")}.`
+      );
+
+      if (!mrResult.success) {
+        return {
+          success: false,
+          pushedCommands: 0,
+          error: mrResult.error || "Failed to create merge request.",
+        };
+      }
+
+      return {
+        success: true,
+        mergeRequestUrl: mrResult.mergeRequestUrl,
+        pushedCommands: localCommands.length,
+      };
+    } catch (error: any) {
+      console.error("Error pushing to GitLab:", error);
+      return {
+        success: false,
+        pushedCommands: 0,
+        error: error.message || "Unknown error during push operation.",
+      };
+    }
   }
 }
 

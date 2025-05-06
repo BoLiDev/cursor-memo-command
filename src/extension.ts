@@ -14,24 +14,30 @@ import {
 } from "./view/tree-provider";
 import { MemoItem } from "./models/memo-item";
 
-// Import all command handlers from the commands index
+import {
+  createRemoveCloudCategoryHandler,
+  createSyncFromGitLabHandler,
+  createManageGitLabTokenHandler,
+} from "./commands/cloud-commands";
 import {
   createSaveCommandHandler,
   createRemoveCommandHandler,
   createRenameCommandHandler,
   createPasteToEditorHandler,
   createEditCommandHandler,
+} from "./commands/local-commands";
+import {
   createAddCategoryHandler,
   createRenameCategoryHandler,
   createDeleteCategoryHandler,
   createMoveToCategoryHandler,
   createAddCommandToCategoryHandler,
+} from "./commands/category-commands";
+import {
   createExportCommandsHandler,
   createImportCommandsHandler,
-  createSyncFromGitLabHandler,
-  createManageGitLabTokenHandler,
-  createRemoveCloudCategoryHandler,
-} from "./commands";
+} from "./commands/data-transfer-commands";
+import { createPushToGitLabHandler } from "./commands/gitlab-push-command";
 
 // Tree Data Provider instance
 let memoTreeProvider: MemoTreeDataProvider;
@@ -124,6 +130,11 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     "cursor-memo.manageGitLabToken":
       createManageGitLabTokenHandler(gitlabService), // Pass gitlabService now
+    "cursor-memo.pushToGitLab": createPushToGitLabHandler(
+      gitlabService,
+      localMemoService,
+      memoTreeProvider
+    ),
 
     // Data Transfer Commands (use localMemoService for local data export/import)
     "cursor-memo.exportCommands": createExportCommandsHandler(localMemoService),

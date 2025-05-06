@@ -47,24 +47,49 @@ export function createSyncFromGitLabHandler(
   memoTreeProvider: MemoTreeDataProvider
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    // Get locally known cloud categories for selection
-    const cloudCategories = new Set<string>();
-    gitlabService.getCloudCommands().forEach((item) => {
-      cloudCategories.add(item.category);
-    });
-    const availableCloudCategories = Array.from(cloudCategories);
+    // First fetch all available categories from GitLab
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Fetching categories from GitLab",
+        cancellable: false,
+      },
+      async (progress) => {
+        progress.report({ message: "Retrieving available categories..." });
 
-    // If no cloud categories are known locally, perform full sync (likely first time)
-    if (availableCloudCategories.length === 0) {
-      vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Syncing from GitLab (All)",
-          cancellable: false,
-        },
-        async (progress) => {
-          progress.report({ message: "Fetching all commands..." });
-          const result = await gitlabService.syncFromGitLab();
+        try {
+          // Get available categories from GitLab
+          const cloudCategories =
+            await gitlabService.fetchAvailableCategories();
+
+          if (!cloudCategories || cloudCategories.length === 0) {
+            vscode.window.showInformationMessage(
+              "No categories available on GitLab"
+            );
+            return;
+          }
+
+          // Let user select categories to sync
+          const selectedOption = await vscode.window.showQuickPick(
+            cloudCategories,
+            {
+              placeHolder: "Select categories to sync from cloud",
+              canPickMany: true,
+            }
+          );
+
+          if (!selectedOption || selectedOption.length === 0) {
+            return;
+          }
+
+          // Perform sync based on user selection
+          progress.report({
+            message: `Syncing ${selectedOption.length} selected categories...`,
+          });
+
+          const result =
+            await gitlabService.syncSelectedFromGitLab(selectedOption);
+
           if (result.success) {
             memoTreeProvider.updateView();
             vscode.window.showInformationMessage(
@@ -75,56 +100,9 @@ export function createSyncFromGitLabHandler(
               `Error syncing from GitLab: ${result.error || "Unknown error"}`
             );
           }
-        }
-      );
-      return;
-    }
-
-    // Provide options to sync selected local categories or all
-    const allOption = "Sync All Categories (Overwrite Local)";
-    const options = [allOption, ...availableCloudCategories];
-
-    const selectedOption = await vscode.window.showQuickPick(options, {
-      placeHolder:
-        "Select existing cloud categories to sync, or choose 'Sync All'",
-      canPickMany: true,
-    });
-
-    if (!selectedOption || selectedOption.length === 0) {
-      return;
-    }
-
-    vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: "Syncing from GitLab",
-        cancellable: false,
-      },
-      async (progress) => {
-        let result;
-        let categoriesToSync: string[] = [];
-
-        // Check if "all" option was selected
-        if (selectedOption.includes(allOption)) {
-          progress.report({ message: "Syncing all categories..." });
-          result = await gitlabService.syncFromGitLab();
-        } else {
-          // Sync only selected categories
-          categoriesToSync = selectedOption;
-          progress.report({
-            message: `Syncing ${categoriesToSync.length} selected categories...`,
-          });
-          result = await gitlabService.syncSelectedFromGitLab(categoriesToSync);
-        }
-
-        if (result.success) {
-          memoTreeProvider.updateView();
-          vscode.window.showInformationMessage(
-            `Synced ${result.syncedCommands} command(s) from GitLab`
-          );
-        } else {
+        } catch (error) {
           vscode.window.showErrorMessage(
-            `Error syncing from GitLab: ${result.error || "Unknown error"}`
+            `Error connecting to GitLab: ${error instanceof Error ? error.message : "Unknown error"}`
           );
         }
       }

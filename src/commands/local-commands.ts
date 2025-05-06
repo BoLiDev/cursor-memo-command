@@ -51,6 +51,7 @@ export function createRemoveCommandHandler(
   return async (item: MemoItem) => {
     if (!item) return;
 
+    // Directly remove the command without confirmation
     const success = await dataService.removeCommand(item.id);
 
     if (success) {

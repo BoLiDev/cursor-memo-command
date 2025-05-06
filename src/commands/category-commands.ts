@@ -5,6 +5,7 @@ import { LocalMemoService } from "../services/local-data-service";
 import { MemoTreeDataProvider } from "../view/tree-provider";
 import { CategoryTreeItem } from "../view/tree-items";
 import { MemoItem } from "../models/memo-item";
+import { createMultilineInputBox } from "../utils";
 
 /**
  * Creates the add category command handler
@@ -115,21 +116,14 @@ export function createDeleteCategoryHandler(
       return;
     }
 
-    const confirmation = await vscode.window.showWarningMessage(
-      `Are you sure you want to delete the category "${categoryName}"? All commands in this category will be moved to the default category.`,
-      { modal: true },
-      "Yes"
-    );
+    // Directly delete category without confirmation
+    const result = await dataService.deleteCategory(categoryName);
 
-    if (confirmation === "Yes") {
-      const result = await dataService.deleteCategory(categoryName);
-
-      if (result.success) {
-        memoTreeProvider.updateView();
-        vscode.window.showInformationMessage(
-          `Category deleted. ${result.commandsMoved} command(s) moved to the default category.`
-        );
-      }
+    if (result.success) {
+      memoTreeProvider.updateView();
+      vscode.window.showInformationMessage(
+        `Category deleted. ${result.commandsMoved} command(s) moved to the default category.`
+      );
     }
   };
 }
@@ -207,11 +201,11 @@ export function createAddCommandToCategoryHandler(
       // Ignore clipboard errors
     }
 
-    const commandText = await vscode.window.showInputBox({
-      placeHolder: "Enter command",
-      prompt: `Add a command to category "${categoryName}"`,
-      value: clipboardText,
-    });
+    const commandText = await createMultilineInputBox(
+      `Add Command to "${categoryName}"`,
+      "Enter or paste the command content",
+      clipboardText
+    );
 
     if (commandText) {
       await dataService.addCommand(commandText, categoryName);
