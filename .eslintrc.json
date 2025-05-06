@@ -1,0 +1,26 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "prettier"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended" // Enables eslint-plugin-prettier and eslint-config-prettier. This will display prettier errors as ESLint errors. Make sure this is always the last configuration in the extends array.
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module"
+  },
+  "rules": {
+    // Place to specify ESLint rules. Can be used to overwrite rules specified from the extended configs
+    // e.g. "@typescript-eslint/explicit-function-return-type": "off",
+    "prettier/prettier": ["error", {}, { "usePrettierrc": true }], // Use .prettierrc rules
+    "@typescript-eslint/no-explicit-any": "off", // Allow 'any' type for now, can be stricter later
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_" }
+    ], // Warn on unused vars, ignore if starts with _
+    "no-console": "warn" // Warn on console.log statements
+  },
+  "ignorePatterns": ["node_modules/", "dist/", "out/"] // Ignore build output and node_modules
+}
