@@ -1,8 +1,8 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { CloudStoreService } from "../services/cloud-store-service";
-import { LocalMemoService } from "../services/local-data-service";
+import { CloudService } from "../services/cloud-service";
+import { LocalService } from "../services/local-service";
 import { MemoItem } from "../models/memo-item";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 import { QuickPickItem } from "vscode";
@@ -15,8 +15,8 @@ import { QuickPickItem } from "vscode";
  * @returns "Push to GitLab" command handler
  */
 export function createPushToGitLabHandler(
-  cloudStoreService: CloudStoreService,
-  localMemoService: LocalMemoService,
+  cloudStoreService: CloudService,
+  localMemoService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {

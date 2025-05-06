@@ -1,7 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { CloudStoreService } from "../services/cloud-store-service";
+import { CloudService } from "../services/cloud-service";
 import { CategoryTreeItem } from "../view/tree-items";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
@@ -13,7 +13,7 @@ import { VSCodeUserInteractionService } from "../services/vscode-user-interactio
  * @returns The remove cloud category handler function
  */
 export function createRemoveCloudCategoryHandler(
-  cloudStoreService: CloudStoreService,
+  cloudStoreService: CloudService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {
@@ -52,7 +52,7 @@ export function createRemoveCloudCategoryHandler(
  * @returns The sync from GitLab command handler function
  */
 export function createSyncFromGitLabHandler(
-  cloudStoreService: CloudStoreService,
+  cloudStoreService: CloudService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
@@ -140,7 +140,7 @@ export function createSyncFromGitLabHandler(
  * @returns The manage GitLab token command handler function
  */
 export function createManageGitLabTokenHandler(
-  cloudStoreService: CloudStoreService,
+  cloudStoreService: CloudService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {

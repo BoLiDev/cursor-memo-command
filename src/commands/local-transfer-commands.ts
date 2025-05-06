@@ -2,8 +2,8 @@
 
 import * as vscode from "vscode";
 import * as fs from "fs";
-import { LocalMemoService } from "../services/local-data-service";
-import { DataTransferService } from "../services/data-transfer-service";
+import { LocalService } from "../services/local-service";
+import { LocalTransferService } from "../services/local-transfer-service";
 import { parseCommands } from "../zod/command-schema";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 import { QuickPickItem } from "vscode";
@@ -15,11 +15,11 @@ import { QuickPickItem } from "vscode";
  * @returns The export commands handler function
  */
 export function createExportCommandsHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    const dataTransferService = new DataTransferService(dataService);
+    const dataTransferService = new LocalTransferService(dataService);
     const commands = dataService.getCommands();
     const categories = dataService.getCategories();
 
@@ -82,11 +82,11 @@ export function createExportCommandsHandler(
  * @returns The import commands handler function
  */
 export function createImportCommandsHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    const dataTransferService = new DataTransferService(dataService);
+    const dataTransferService = new LocalTransferService(dataService);
 
     const openDialogOptions: vscode.OpenDialogOptions = {
       canSelectFiles: true,
@@ -155,7 +155,7 @@ export function createImportCommandsHandler(
 async function importSelectedData(
   jsonData: string,
   selectedCategories: string[],
-  dataTransferService: DataTransferService,
+  dataTransferService: LocalTransferService,
   uiService: VSCodeUserInteractionService
 ): Promise<void> {
   const result = await dataTransferService.importSelectedData(

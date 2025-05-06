@@ -2,10 +2,10 @@
 
 import * as vscode from "vscode";
 
-import { LocalMemoService } from "./services/local-data-service";
-import { GitlabApiService } from "./services/gitlab-api-service";
-import { CloudStoreService } from "./services/cloud-store-service";
-import { StorageService } from "./services/storage-service";
+import { LocalService } from "./services/local-service";
+import { GitlabApiService } from "./services/cloud-api-service";
+import { CloudService } from "./services/cloud-service";
+import { VscodeStorageService } from "./services/vscode-storage-service";
 import { ConfigurationService } from "./services/configuration-service";
 import { VSCodeUserInteractionService } from "./services/vscode-user-interaction-service"; // Use class
 
@@ -38,8 +38,8 @@ import {
 import {
   createExportCommandsHandler,
   createImportCommandsHandler,
-} from "./commands/data-transfer-commands";
-import { createPushToGitLabHandler } from "./commands/gitlab-push-command";
+} from "./commands/local-transfer-commands";
+import { createPushToGitLabHandler } from "./commands/cloud-push-command";
 
 let memoTreeProvider: MemoTreeDataProvider;
 let memoTreeView: vscode.TreeView<
@@ -54,16 +54,16 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log('"cursor-memo" is now active!');
 
   // Instantiate core services first
-  const storageService = new StorageService(context);
+  const storageService = new VscodeStorageService(context);
   const configService = new ConfigurationService(context);
   const uiService = new VSCodeUserInteractionService(); // Use class directly
 
   // Instantiate dependent services, injecting dependencies
-  const localMemoService = new LocalMemoService(storageService);
+  const localMemoService = new LocalService(storageService);
 
   // Instantiate new GitLab services
   const gitlabApiService = new GitlabApiService(storageService, configService);
-  const cloudStoreService = new CloudStoreService(
+  const cloudStoreService = new CloudService(
     storageService,
     configService,
     gitlabApiService

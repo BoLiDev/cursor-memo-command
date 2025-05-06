@@ -1,7 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { LocalMemoService } from "../services/local-data-service";
+import { LocalService } from "../services/local-service";
 import { CategoryTreeItem } from "../view/tree-items";
 import { MemoItem } from "../models/memo-item";
 import { Category } from "../models/category";
@@ -14,7 +14,7 @@ import { VSCodeUserInteractionService } from "../services/vscode-user-interactio
  * @returns The add category command handler function
  */
 export function createAddCategoryHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
@@ -46,7 +46,7 @@ export function createAddCategoryHandler(
  * @returns The rename category command handler function
  */
 export function createRenameCategoryHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryTreeItem: CategoryTreeItem) => {
@@ -98,7 +98,7 @@ export function createRenameCategoryHandler(
  * @returns The delete category command handler function
  */
 export function createDeleteCategoryHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {
@@ -145,7 +145,7 @@ export function createDeleteCategoryHandler(
  * @returns The move to category command handler function
  */
 export function createMoveToCategoryHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
@@ -204,7 +204,7 @@ export function createMoveToCategoryHandler(
  * @returns The add command to category handler function
  */
 export function createAddCommandToCategoryHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {

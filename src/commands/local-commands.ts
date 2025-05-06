@@ -1,7 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { LocalMemoService } from "../services/local-data-service";
+import { LocalService } from "../services/local-service";
 import { MemoItem } from "../models/memo-item";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
@@ -21,7 +21,7 @@ async function directPaste(): Promise<void> {
  * @returns The save command handler function
  */
 export function createSaveCommandHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
@@ -51,7 +51,7 @@ export function createSaveCommandHandler(
  * @returns The remove command handler function
  */
 export function createRemoveCommandHandler(
-  dataService: LocalMemoService
+  dataService: LocalService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
     if (!item) return;
@@ -74,7 +74,7 @@ export function createRemoveCommandHandler(
  * @returns The rename command handler function
  */
 export function createRenameCommandHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
@@ -119,7 +119,7 @@ export function createPasteToEditorHandler(
  * @returns The edit command handler function
  */
 export function createEditCommandHandler(
-  dataService: LocalMemoService,
+  dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {

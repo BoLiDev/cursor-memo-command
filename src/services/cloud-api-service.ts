@@ -8,7 +8,7 @@ import {
   GitLabMergeRequestResponseSchema,
   GitLabFileCommitResponseSchema,
 } from "../zod";
-import { StorageService } from "./storage-service";
+import { VscodeStorageService } from "./vscode-storage-service";
 import { ConfigurationService } from "./configuration-service";
 
 // Define a specific error type for API issues
@@ -30,7 +30,7 @@ export class GitlabApiService {
   private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
 
   constructor(
-    private storageService: StorageService,
+    private storageService: VscodeStorageService,
     private configService: ConfigurationService
   ) {}
 

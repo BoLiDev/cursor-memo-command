@@ -7,10 +7,10 @@ import {
   parseCommands,
   serializeCommands,
   CommandsStructureSchema,
-} from "../zod/command-schema";
-import { StorageService } from "./storage-service";
+} from "../zod";
+import { VscodeStorageService } from "./vscode-storage-service";
 import { ConfigurationService } from "./configuration-service";
-import { GitlabApiService, GitlabApiError } from "./gitlab-api-service";
+import { GitlabApiService, GitlabApiError } from "./cloud-api-service";
 import { z } from "zod";
 
 export type CloudOperationResult<T> =
@@ -21,7 +21,7 @@ export type CloudOperationResult<T> =
  * Manages the state of cloud-synchronized commands.
  * Interacts with GitlabApiService to fetch/push data and StorageService to persist state.
  */
-export class CloudStoreService {
+export class CloudService {
   private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "Default";
@@ -34,7 +34,7 @@ export class CloudStoreService {
   private initialized: boolean = false;
 
   constructor(
-    private storageService: StorageService,
+    private storageService: VscodeStorageService,
     private configService: ConfigurationService,
     private gitlabApiService: GitlabApiService
   ) {}
@@ -187,7 +187,7 @@ export class CloudStoreService {
     const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
     const filteredCommands = allImportedCommands.filter((cmd) =>
       selectedCategories.includes(
-        cmd.categoryId || CloudStoreService.DEFAULT_CATEGORY
+        cmd.categoryId || CloudService.DEFAULT_CATEGORY
       )
     );
 
@@ -360,10 +360,7 @@ export class CloudStoreService {
    * Set GitLab Personal Access Token.
    */
   public async setToken(token: string): Promise<void> {
-    await this.storageService.setSecret(
-      CloudStoreService.GITLAB_TOKEN_KEY,
-      token
-    );
+    await this.storageService.setSecret(CloudService.GITLAB_TOKEN_KEY, token);
     console.log("GitLab token stored.");
   }
 
@@ -371,20 +368,20 @@ export class CloudStoreService {
    * Clear stored GitLab Personal Access Token.
    */
   public async clearToken(): Promise<void> {
-    await this.storageService.deleteSecret(CloudStoreService.GITLAB_TOKEN_KEY);
+    await this.storageService.deleteSecret(CloudService.GITLAB_TOKEN_KEY);
     console.log("GitLab token cleared.");
   }
 
   private async saveCloudCommands(): Promise<void> {
     await this.storageService.setValue(
-      CloudStoreService.CLOUD_COMMANDS_KEY,
+      CloudService.CLOUD_COMMANDS_KEY,
       this.cloudCommands
     );
   }
 
   private async loadCloudCommands(): Promise<void> {
     const stored = this.storageService.getValue<MemoItem[]>(
-      CloudStoreService.CLOUD_COMMANDS_KEY,
+      CloudService.CLOUD_COMMANDS_KEY,
       []
     );
     this.cloudCommands = stored.map((cmd) => ({ ...cmd, isCloud: true }));

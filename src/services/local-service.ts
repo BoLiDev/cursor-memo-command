@@ -3,12 +3,12 @@
 import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
 import { Category } from "../models/category";
-import { StorageService } from "./storage-service";
+import { VscodeStorageService } from "./vscode-storage-service";
 
 /**
  * Service for managing local memo items and categories.
  */
-export class LocalMemoService {
+export class LocalService {
   private static STORAGE_KEY = "cursor-memo-commands";
   private static CATEGORIES_KEY = "cursor-memo-categories";
   private static DEFAULT_CATEGORY = "Default";
@@ -29,7 +29,7 @@ export class LocalMemoService {
    * Constructor
    * @param storageService Instance of StorageService for accessing stored data
    */
-  constructor(private storageService: StorageService) {}
+  constructor(private storageService: VscodeStorageService) {}
 
   /**
    * Initialize the local data service
@@ -43,7 +43,7 @@ export class LocalMemoService {
     }
 
     const storedCommands = this.storageService.getValue<MemoItem[]>(
-      LocalMemoService.STORAGE_KEY,
+      LocalService.STORAGE_KEY,
       []
     );
 
@@ -52,7 +52,7 @@ export class LocalMemoService {
         console.warn(
           `Command ${cmd.id} missing categoryId, assigning to Default.`
         );
-        return { ...cmd, categoryId: LocalMemoService.DEFAULT_CATEGORY };
+        return { ...cmd, categoryId: LocalService.DEFAULT_CATEGORY };
       }
       return cmd;
     });
@@ -62,19 +62,17 @@ export class LocalMemoService {
     }
 
     const storedCategories = this.storageService.getValue<Category[]>(
-      LocalMemoService.CATEGORIES_KEY,
+      LocalService.CATEGORIES_KEY,
       []
     );
     this.categories = storedCategories;
 
     if (
-      !this.categories.some(
-        (cat) => cat.id === LocalMemoService.DEFAULT_CATEGORY
-      )
+      !this.categories.some((cat) => cat.id === LocalService.DEFAULT_CATEGORY)
     ) {
       this.categories.push({
-        id: LocalMemoService.DEFAULT_CATEGORY,
-        name: LocalMemoService.DEFAULT_CATEGORY,
+        id: LocalService.DEFAULT_CATEGORY,
+        name: LocalService.DEFAULT_CATEGORY,
       });
       await this.saveCategories();
     }
@@ -106,7 +104,7 @@ export class LocalMemoService {
    * @deprecated Prefer getDefaultCategoryId
    */
   public getDefaultCategory(): string {
-    return LocalMemoService.DEFAULT_CATEGORY;
+    return LocalService.DEFAULT_CATEGORY;
   }
 
   /**
@@ -114,7 +112,7 @@ export class LocalMemoService {
    * @returns The ID of the default category
    */
   public getDefaultCategoryId(): string {
-    return LocalMemoService.DEFAULT_CATEGORY;
+    return LocalService.DEFAULT_CATEGORY;
   }
 
   /**
@@ -428,10 +426,7 @@ export class LocalMemoService {
    * @returns Promise that resolves when commands have been saved
    */
   private async saveCommands(): Promise<void> {
-    await this.storageService.setValue(
-      LocalMemoService.STORAGE_KEY,
-      this.commands
-    );
+    await this.storageService.setValue(LocalService.STORAGE_KEY, this.commands);
   }
 
   /**
@@ -440,7 +435,7 @@ export class LocalMemoService {
    */
   private async saveCategories(): Promise<void> {
     await this.storageService.setValue<Category[]>(
-      LocalMemoService.CATEGORIES_KEY,
+      LocalService.CATEGORIES_KEY,
       this.categories
     );
   }

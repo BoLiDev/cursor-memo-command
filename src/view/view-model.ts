@@ -2,8 +2,8 @@
 
 import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
-import { LocalMemoService } from "../services/local-data-service";
-import { CloudStoreService } from "../services/cloud-store-service";
+import { LocalService } from "../services/local-service";
+import { CloudService } from "../services/cloud-service";
 import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
 import { Category } from "../models/category";
 
@@ -34,8 +34,8 @@ export class MemoTreeViewModel {
    * @param cloudStoreService Service for cloud data
    */
   constructor(
-    private localDataService: LocalMemoService,
-    private cloudStoreService: CloudStoreService
+    private localDataService: LocalService,
+    private cloudStoreService: CloudService
   ) {
     // Initialize group nodes
     this.localGroupNode = new CategoryGroupTreeItem(

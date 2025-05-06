@@ -1,7 +1,7 @@
 /** @format */
 
 import { MemoItem } from "../models/memo-item";
-import { LocalMemoService } from "./local-data-service";
+import { LocalService } from "./local-service";
 import {
   CommandsStructureSchema,
   parseCommands,
@@ -13,8 +13,8 @@ import { Category } from "../models/category";
 /**
  * Service for handling data import and export operations for LOCAL data.
  */
-export class DataTransferService {
-  constructor(private dataService: LocalMemoService) {}
+export class LocalTransferService {
+  constructor(private dataService: LocalService) {}
 
   /**
    * Export all data as JSON string using the human-friendly format

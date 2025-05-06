@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 /**
  * Service for abstracting interactions with VS Code's storage (globalState and secrets).
  */
-export class StorageService {
+export class VscodeStorageService {
   constructor(private context: vscode.ExtensionContext) {}
 
   /**
