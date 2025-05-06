@@ -3,17 +3,20 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import { LocalMemoService } from "../services/local-data-service";
-import { MemoTreeDataProvider } from "../view/tree-provider";
 import { DataTransferService } from "../services/data-transfer-service";
 import { parseCommands } from "../zod/command-schema";
+import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
+import { QuickPickItem } from "vscode";
 
 /**
  * Creates the export commands handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The export commands handler function
  */
 export function createExportCommandsHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
     const dataTransferService = new DataTransferService(dataService);
@@ -21,18 +24,18 @@ export function createExportCommandsHandler(
     const categories = dataService.getCategories();
 
     if (commands.length === 0) {
-      vscode.window.showInformationMessage("No commands to export");
+      await uiService.showInformationMessage("No commands to export");
       return;
     }
 
     // Provide options to export selected categories or all
-    const options: vscode.QuickPickItem[] = categories.map((cat) => ({
+    const options: QuickPickItem[] = categories.map((cat) => ({
       label: cat.name,
       description:
         cat.id === dataService.getDefaultCategoryId() ? "(Default)" : "",
     }));
 
-    const selectedQuickPickItems = await vscode.window.showQuickPick(options, {
+    const selectedQuickPickItems = await uiService.showQuickPick(options, {
       placeHolder: "Select categories to export",
       canPickMany: true,
     });
@@ -62,11 +65,11 @@ export function createExportCommandsHandler(
     if (uri) {
       try {
         fs.writeFileSync(uri.fsPath, exportData);
-        vscode.window.showInformationMessage(
+        await uiService.showInformationMessage(
           `Commands exported to ${uri.fsPath}`
         );
       } catch (error) {
-        vscode.window.showErrorMessage(`Error exporting commands: ${error}`);
+        await uiService.showErrorMessage(`Error exporting commands: ${error}`);
       }
     }
   };
@@ -75,10 +78,12 @@ export function createExportCommandsHandler(
 /**
  * Creates the import commands handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The import commands handler function
  */
 export function createImportCommandsHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
     const dataTransferService = new DataTransferService(dataService);
@@ -99,22 +104,18 @@ export function createImportCommandsHandler(
         const fileContents = fs.readFileSync(uris[0].fsPath, "utf8");
 
         try {
-          // 使用新的解析方式
           const commandsData = parseCommands(fileContents);
-
-          // 从解析后的数据中获取分类
           const availableCategories = Object.keys(commandsData);
 
           if (availableCategories.length === 0) {
-            vscode.window.showInformationMessage(
+            await uiService.showInformationMessage(
               "No commands found in the file to import."
             );
             return;
           }
 
-          // 提供选项来导入选定的分类
-          const selectedOption = await vscode.window.showQuickPick(
-            availableCategories,
+          const selectedOption = await uiService.showQuickPick(
+            availableCategories.map((cat) => ({ label: cat })),
             {
               placeHolder: "Select categories to import",
               canPickMany: true,
@@ -125,19 +126,24 @@ export function createImportCommandsHandler(
             return;
           }
 
-          // 导入选定的分类
+          // Extract labels
+          const selectedCategoryLabels = selectedOption.map(
+            (item) => item.label
+          );
+
           await importSelectedData(
-            fileContents, // 仍然传递原始 JSON 字符串
-            selectedOption,
-            dataTransferService
+            fileContents,
+            selectedCategoryLabels,
+            dataTransferService,
+            uiService
           );
         } catch (parseError) {
-          vscode.window.showErrorMessage(
+          await uiService.showErrorMessage(
             `Invalid command data format: ${parseError}`
           );
         }
       } catch (error) {
-        vscode.window.showErrorMessage(`Error reading file: ${error}`);
+        await uiService.showErrorMessage(`Error reading file: ${error}`);
       }
     }
   };
@@ -149,7 +155,8 @@ export function createImportCommandsHandler(
 async function importSelectedData(
   jsonData: string,
   selectedCategories: string[],
-  dataTransferService: DataTransferService
+  dataTransferService: DataTransferService,
+  uiService: VSCodeUserInteractionService
 ): Promise<void> {
   const result = await dataTransferService.importSelectedData(
     jsonData,
@@ -157,10 +164,10 @@ async function importSelectedData(
   );
 
   if (result.success) {
-    vscode.window.showInformationMessage(
+    await uiService.showInformationMessage(
       `Imported ${result.importedCommands} commands and ${result.importedCategories} categories`
     );
   } else {
-    vscode.window.showErrorMessage("Failed to import commands");
+    await uiService.showErrorMessage("Failed to import commands");
   }
 }

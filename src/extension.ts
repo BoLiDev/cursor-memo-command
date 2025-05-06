@@ -4,10 +4,11 @@ import * as vscode from "vscode";
 
 // Import services
 import { LocalMemoService } from "./services/local-data-service";
-import { GitlabApiService } from "./services/gitlab-api-service"; // Import new API service
-import { CloudStoreService } from "./services/cloud-store-service"; // Import new cloud state service
+import { GitlabApiService } from "./services/gitlab-api-service";
+import { CloudStoreService } from "./services/cloud-store-service";
 import { StorageService } from "./services/storage-service";
 import { ConfigurationService } from "./services/configuration-service";
+import { VSCodeUserInteractionService } from "./services/vscode-user-interaction-service"; // Use class
 
 // Import view provider and required types
 import {
@@ -60,6 +61,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Instantiate core services first
   const storageService = new StorageService(context);
   const configService = new ConfigurationService(context);
+  const uiService = new VSCodeUserInteractionService(); // Use class directly
 
   // Instantiate dependent services, injecting dependencies
   const localMemoService = new LocalMemoService(storageService);
@@ -74,7 +76,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Initialize both services (they load their respective data)
   await localMemoService.initialize();
-  await cloudStoreService.initialize(); // Initialize new CloudStoreService
+  await cloudStoreService.initialize();
 
   // Instantiate TreeDataProvider with both services
   memoTreeProvider = new MemoTreeDataProvider(
@@ -93,49 +95,80 @@ export async function activate(context: vscode.ExtensionContext) {
   memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
   // --- Register Commands ---
-  // Pass only the necessary service instances to command handlers
+  // Pass the VSCodeUserInteractionService instance
   const commands: { [key: string]: (...args: any[]) => Promise<void> } = {
-    // Local Commands (use localMemoService)
-    "cursor-memo.saveCommand": createSaveCommandHandler(localMemoService),
+    // Local Commands
+    "cursor-memo.saveCommand": createSaveCommandHandler(
+      localMemoService,
+      uiService
+    ),
     "cursor-memo.removeCommand": createRemoveCommandHandler(localMemoService),
-    "cursor-memo.renameCommand": createRenameCommandHandler(localMemoService),
-    "cursor-memo.pasteToEditor": createPasteToEditorHandler(), // No service needed
-    "cursor-memo.editCommand": createEditCommandHandler(localMemoService),
-
-    // Category Commands (use localMemoService for local categories)
-    "cursor-memo.addCategory": createAddCategoryHandler(localMemoService),
-    "cursor-memo.renameCategory": createRenameCategoryHandler(localMemoService),
-    "cursor-memo.deleteCategory": createDeleteCategoryHandler(localMemoService),
-    "cursor-memo.moveToCategory": createMoveToCategoryHandler(localMemoService),
-    "cursor-memo.addCommandToCategory":
-      createAddCommandToCategoryHandler(localMemoService),
-
-    // Cloud/GitLab Commands (use cloudStoreService)
-    "cursor-memo.removeCloudCategory":
-      createRemoveCloudCategoryHandler(cloudStoreService),
-    "cursor-memo.syncFromGitLab":
-      createSyncFromGitLabHandler(cloudStoreService),
-    "cursor-memo.manageGitLabToken":
-      createManageGitLabTokenHandler(cloudStoreService),
-    "cursor-memo.pushToGitLab": createPushToGitLabHandler(
-      cloudStoreService,
-      localMemoService
+    "cursor-memo.renameCommand": createRenameCommandHandler(
+      localMemoService,
+      uiService
+    ),
+    "cursor-memo.pasteToEditor": createPasteToEditorHandler(uiService),
+    "cursor-memo.editCommand": createEditCommandHandler(
+      localMemoService,
+      uiService
     ),
 
-    // Data Transfer Commands (use localMemoService for local data export/import)
-    "cursor-memo.exportCommands": createExportCommandsHandler(localMemoService),
-    "cursor-memo.importCommands": createImportCommandsHandler(localMemoService),
+    // Category Commands
+    "cursor-memo.addCategory": createAddCategoryHandler(
+      localMemoService,
+      uiService
+    ),
+    "cursor-memo.renameCategory": createRenameCategoryHandler(
+      localMemoService,
+      uiService
+    ),
+    "cursor-memo.deleteCategory": createDeleteCategoryHandler(
+      localMemoService,
+      uiService
+    ),
+    "cursor-memo.moveToCategory": createMoveToCategoryHandler(
+      localMemoService,
+      uiService
+    ),
+    "cursor-memo.addCommandToCategory": createAddCommandToCategoryHandler(
+      localMemoService,
+      uiService
+    ),
 
-    // Refresh command - now likely obsolete or could trigger service reloads
+    // Cloud/GitLab Commands
+    "cursor-memo.removeCloudCategory": createRemoveCloudCategoryHandler(
+      cloudStoreService,
+      uiService
+    ),
+    "cursor-memo.syncFromGitLab": createSyncFromGitLabHandler(
+      cloudStoreService,
+      uiService
+    ),
+    "cursor-memo.manageGitLabToken": createManageGitLabTokenHandler(
+      cloudStoreService,
+      uiService
+    ),
+    "cursor-memo.pushToGitLab": createPushToGitLabHandler(
+      cloudStoreService,
+      localMemoService,
+      uiService
+    ),
+
+    // Data Transfer Commands
+    "cursor-memo.exportCommands": createExportCommandsHandler(
+      localMemoService,
+      uiService
+    ),
+    "cursor-memo.importCommands": createImportCommandsHandler(
+      localMemoService,
+      uiService
+    ),
+
+    // Refresh command
     "cursor-memo.refresh": async () => {
-      // View updates automatically via events. Manual refresh logic might be needed
-      // if there are cases where events might not cover everything (e.g., config change affecting view)
       console.log(
         "Refresh triggered. View should update automatically via events."
       );
-      // Optionally, force service re-initialization or data fetching:
-      // await localMemoService.initialize(); // Example: Force reload local data
-      // await cloudStoreService.initialize(); // Example: Force reload cloud data
     },
   };
 
@@ -146,9 +179,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
   }
 
-  // Initial view is populated automatically by the provider's constructor listening to view model events.
-  // The explicit refresh call here is no longer needed.
-  // memoTreeProvider.updateView(); // REMOVED
+  // Initial view is populated automatically...
 }
 
 /**

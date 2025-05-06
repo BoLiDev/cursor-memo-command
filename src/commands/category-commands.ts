@@ -2,22 +2,23 @@
 
 import * as vscode from "vscode";
 import { LocalMemoService } from "../services/local-data-service";
-import { MemoTreeDataProvider } from "../view/tree-provider";
 import { CategoryTreeItem } from "../view/tree-items";
 import { MemoItem } from "../models/memo-item";
-import { createMultilineInputBox } from "../utils";
 import { Category } from "../models/category";
+import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
 /**
  * Creates the add category command handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The add category command handler function
  */
 export function createAddCategoryHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    const categoryName = await vscode.window.showInputBox({
+    const categoryName = await uiService.showInputBox({
       placeHolder: "Enter new category name",
       prompt: "Please enter the name for the new category",
     });
@@ -26,11 +27,11 @@ export function createAddCategoryHandler(
       const success = await dataService.addCategory(categoryName.trim());
 
       if (success) {
-        vscode.window.showInformationMessage(
+        await uiService.showInformationMessage(
           `Category "${categoryName}" created`
         );
       } else {
-        vscode.window.showInformationMessage(
+        await uiService.showInformationMessage(
           `Category "${categoryName}" already exists`
         );
       }
@@ -41,10 +42,12 @@ export function createAddCategoryHandler(
 /**
  * Creates the rename category command handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The rename category command handler function
  */
 export function createRenameCategoryHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryTreeItem: CategoryTreeItem) => {
     if (!categoryTreeItem) return;
@@ -53,13 +56,13 @@ export function createRenameCategoryHandler(
     const defaultCategoryId = dataService.getDefaultCategoryId();
 
     if (categoryToRename.id === defaultCategoryId) {
-      vscode.window.showInformationMessage(
+      await uiService.showInformationMessage(
         `Cannot rename the default category`
       );
       return;
     }
 
-    const newCategoryName = await vscode.window.showInputBox({
+    const newCategoryName = await uiService.showInputBox({
       placeHolder: "Enter new category name",
       prompt: "Please enter the new name for the category",
       value: categoryToRename.name,
@@ -76,11 +79,11 @@ export function createRenameCategoryHandler(
       );
 
       if (success) {
-        vscode.window.showInformationMessage(
+        await uiService.showInformationMessage(
           `Category renamed to "${newCategoryName}"`
         );
       } else {
-        vscode.window.showInformationMessage(
+        await uiService.showInformationMessage(
           `A category named "${newCategoryName}" already exists`
         );
       }
@@ -91,10 +94,12 @@ export function createRenameCategoryHandler(
 /**
  * Creates the delete category command handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The delete category command handler function
  */
 export function createDeleteCategoryHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {
     if (!categoryItem) return;
@@ -103,17 +108,31 @@ export function createDeleteCategoryHandler(
     const defaultCategory = dataService.getDefaultCategory();
 
     if (categoryName === defaultCategory) {
-      vscode.window.showInformationMessage(
+      await uiService.showInformationMessage(
         `Cannot delete the default category`
       );
+      return;
+    }
+
+    const confirmationItem = await uiService.showWarningMessage(
+      `Are you sure you want to delete the category "${categoryName}"? Commands inside will be moved to Default.`,
+      { modal: true },
+      { title: "Delete" }
+    );
+
+    if (confirmationItem?.title !== "Delete") {
       return;
     }
 
     const result = await dataService.deleteCategory(categoryItem.category.id);
 
     if (result.success) {
-      vscode.window.showInformationMessage(
+      await uiService.showInformationMessage(
         `Category deleted. ${result.commandsMoved} command(s) moved to the default category.`
+      );
+    } else {
+      await uiService.showErrorMessage(
+        `Failed to delete category "${categoryName}".`
       );
     }
   };
@@ -122,10 +141,12 @@ export function createDeleteCategoryHandler(
 /**
  * Creates the move to category command handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The move to category command handler function
  */
 export function createMoveToCategoryHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
     if (!item) return;
@@ -138,25 +159,28 @@ export function createMoveToCategoryHandler(
     );
 
     if (availableCategories.length === 0) {
-      vscode.window.showInformationMessage(
+      await uiService.showInformationMessage(
         "No other categories available to move to"
       );
       return;
     }
 
-    const selectedCategoryItem = await vscode.window.showQuickPick<
-      vscode.QuickPickItem & { category: Category }
-    >(
-      availableCategories.map((cat) => ({
-        label: cat.name,
-        description:
-          cat.id === dataService.getDefaultCategoryId() ? "(Default)" : "",
-        category: cat,
-      })),
-      {
-        placeHolder: "Select a category to move this command to",
-      }
-    );
+    type CategoryQuickPickItem = vscode.QuickPickItem & { category: Category };
+
+    const selectedCategoryItem =
+      await uiService.showQuickPick<CategoryQuickPickItem>(
+        availableCategories.map(
+          (cat): CategoryQuickPickItem => ({
+            label: cat.name,
+            description:
+              cat.id === dataService.getDefaultCategoryId() ? "(Default)" : "",
+            category: cat,
+          })
+        ),
+        {
+          placeHolder: "Select a category to move this command to",
+        }
+      );
 
     if (selectedCategoryItem) {
       const success = await dataService.moveCommandToCategory(
@@ -165,7 +189,7 @@ export function createMoveToCategoryHandler(
       );
 
       if (success) {
-        vscode.window.showInformationMessage(
+        await uiService.showInformationMessage(
           `Command moved to "${selectedCategoryItem.category.name}"`
         );
       }
@@ -176,10 +200,12 @@ export function createMoveToCategoryHandler(
 /**
  * Creates the add command to category handler
  * @param dataService The local memo data service
+ * @param uiService The user interaction service
  * @returns The add command to category handler function
  */
 export function createAddCommandToCategoryHandler(
-  dataService: LocalMemoService
+  dataService: LocalMemoService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {
     if (!categoryItem) return;
@@ -188,12 +214,12 @@ export function createAddCommandToCategoryHandler(
 
     let clipboardText = "";
     try {
-      clipboardText = await vscode.env.clipboard.readText();
+      clipboardText = await uiService.readClipboard();
     } catch (error) {
-      // Ignore clipboard errors
+      console.warn("Failed to read clipboard:", error);
     }
 
-    const commandText = await createMultilineInputBox(
+    const commandText = await uiService.createMultilineInputBox(
       `Add Command to "${categoryName}"`,
       "Enter or paste the command content",
       clipboardText
@@ -201,7 +227,7 @@ export function createAddCommandToCategoryHandler(
 
     if (commandText) {
       await dataService.addCommand(commandText, categoryItem.category.id);
-      vscode.window.showInformationMessage(
+      await uiService.showInformationMessage(
         `Command added to "${categoryName}"`
       );
     }
