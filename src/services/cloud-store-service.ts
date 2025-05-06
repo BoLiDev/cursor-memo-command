@@ -27,6 +27,11 @@ export class CloudStoreService {
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "Default";
 
+  // --- Event Emitters ---
+  private _onDidCloudCommandsChange = new vscode.EventEmitter<void>();
+  readonly onDidCloudCommandsChange: vscode.Event<void> =
+    this._onDidCloudCommandsChange.event;
+
   private cloudCommands: MemoItem[] = [];
   private initialized: boolean = false;
 
@@ -129,6 +134,7 @@ export class CloudStoreService {
     }));
 
     await this.saveCloudCommands();
+    this._onDidCloudCommandsChange.fire();
     console.log(`Synced ${this.cloudCommands.length} commands from GitLab.`);
     return {
       success: true,
@@ -161,6 +167,7 @@ export class CloudStoreService {
     }));
 
     await this.saveCloudCommands();
+    this._onDidCloudCommandsChange.fire();
     console.log(
       `Synced ${this.cloudCommands.length} commands from selected categories: ${selectedCategories.join(", ")}`
     );
@@ -198,6 +205,7 @@ export class CloudStoreService {
 
     if (removedCount > 0) {
       await this.saveCloudCommands();
+      this._onDidCloudCommandsChange.fire();
       console.log(
         `Removed cloud category '${categoryName}' (${removedCount} commands) from local store.`
       );

@@ -1,5 +1,6 @@
 /** @format */
 
+import * as vscode from "vscode"; // Import vscode for EventEmitter
 import { MemoItem } from "../models/memo-item";
 import { Category } from "../models/category";
 import { StorageService } from "./storage-service";
@@ -15,6 +16,15 @@ export class LocalMemoService {
   private commands: MemoItem[] = [];
   private categories: Category[] = [];
   private initialized: boolean = false;
+
+  // --- Event Emitters ---
+  private _onDidCommandsChange = new vscode.EventEmitter<void>();
+  readonly onDidCommandsChange: vscode.Event<void> =
+    this._onDidCommandsChange.event;
+
+  private _onDidCategoriesChange = new vscode.EventEmitter<void>();
+  readonly onDidCategoriesChange: vscode.Event<void> =
+    this._onDidCategoriesChange.event;
 
   /**
    * Constructor
@@ -136,6 +146,7 @@ export class LocalMemoService {
 
     this.commands = [...this.commands, newItem];
     await this.saveCommands();
+    this._onDidCommandsChange.fire();
     return newItem;
   }
 
@@ -154,6 +165,9 @@ export class LocalMemoService {
     }));
     this.commands = [...this.commands, ...localNewCommands];
     await this.saveCommands();
+    if (localNewCommands.length > 0) {
+      this._onDidCommandsChange.fire();
+    }
   }
 
   /**
@@ -167,6 +181,7 @@ export class LocalMemoService {
 
     if (this.commands.length !== originalLength) {
       await this.saveCommands();
+      this._onDidCommandsChange.fire();
       return true;
     }
     return false;
@@ -191,6 +206,7 @@ export class LocalMemoService {
 
     if (updated) {
       await this.saveCommands();
+      this._onDidCommandsChange.fire();
       return true;
     }
     return false;
@@ -222,6 +238,7 @@ export class LocalMemoService {
 
     if (updated) {
       await this.saveCommands();
+      this._onDidCommandsChange.fire();
       return true;
     }
     return false;
@@ -241,6 +258,7 @@ export class LocalMemoService {
     const newCategory: Category = { id: trimmedName, name: trimmedName };
     this.categories.push(newCategory);
     await this.saveCategories();
+    this._onDidCategoriesChange.fire();
     return true;
   }
 
@@ -261,6 +279,7 @@ export class LocalMemoService {
     if (uniqueNewCategories.length > 0) {
       this.categories.push(...uniqueNewCategories);
       await this.saveCategories();
+      this._onDidCategoriesChange.fire();
       return true;
     }
     return false;
@@ -296,10 +315,18 @@ export class LocalMemoService {
 
     this.categories = this.categories.filter((cat) => cat.id !== categoryId);
 
-    await Promise.all([
-      commandsMoved > 0 ? this.saveCommands() : Promise.resolve(),
-      this.saveCategories(),
-    ]);
+    const savePromises: Promise<void>[] = [];
+    if (commandsMoved > 0) {
+      savePromises.push(this.saveCommands());
+    }
+    savePromises.push(this.saveCategories());
+
+    await Promise.all(savePromises);
+
+    if (commandsMoved > 0) {
+      this._onDidCommandsChange.fire();
+    }
+    this._onDidCategoriesChange.fire();
 
     return { success: true, commandsMoved };
   }
@@ -350,11 +377,16 @@ export class LocalMemoService {
     });
 
     const promises = [];
-    if (commandsUpdated) promises.push(this.saveCommands());
-    if (categoryUpdated) promises.push(this.saveCategories());
+    const needsCommandSave = commandsUpdated;
+    const needsCategorySave = categoryUpdated;
+
+    if (needsCommandSave) promises.push(this.saveCommands());
+    if (needsCategorySave) promises.push(this.saveCategories());
 
     if (promises.length > 0) {
       await Promise.all(promises);
+      if (needsCommandSave) this._onDidCommandsChange.fire();
+      if (needsCategorySave) this._onDidCategoriesChange.fire();
       return true;
     }
 
@@ -386,6 +418,7 @@ export class LocalMemoService {
 
     if (updated) {
       await this.saveCommands();
+      this._onDidCommandsChange.fire();
       return true;
     }
     return false;
