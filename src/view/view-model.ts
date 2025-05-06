@@ -118,21 +118,6 @@ export class MemoTreeViewModel {
   }
 
   /**
-   * Remove prefix from category ID to get the original ID
-   * @param prefixedId Prefixed category ID
-   * @returns Original category ID
-   */
-  private getOriginalCategoryId(prefixedId: string): string {
-    if (prefixedId.startsWith(MemoTreeViewModel.CLOUD_PREFIX)) {
-      return prefixedId.substring(MemoTreeViewModel.CLOUD_PREFIX.length);
-    }
-    if (prefixedId.startsWith(MemoTreeViewModel.LOCAL_PREFIX)) {
-      return prefixedId.substring(MemoTreeViewModel.LOCAL_PREFIX.length);
-    }
-    return prefixedId;
-  }
-
-  /**
    * Rebuilds the internal maps of category tree items.
    */
   private rebuildCategoryNodes(): void {
@@ -142,6 +127,15 @@ export class MemoTreeViewModel {
     // Build local category nodes
     this.localCategories.forEach((category) => {
       const items = this.getLocalCategoryItems(category.id);
+
+      // Hide the default category if it is empty
+      if (
+        category.id === this.localDataService.getDefaultCategoryId() &&
+        items.length === 0
+      ) {
+        return;
+      }
+
       const collapsibleState =
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
@@ -169,7 +163,7 @@ export class MemoTreeViewModel {
         id: catId,
         name:
           catId === this.cloudStoreService.getDefaultCategoryId()
-            ? "General (Cloud)"
+            ? `${CloudService.DEFAULT_CATEGORY} (Cloud)`
             : catId,
       };
 
@@ -181,22 +175,22 @@ export class MemoTreeViewModel {
       );
     });
 
-    // --- Update Group Node States ---
+    // Update Group Node States
     const localCollapsibleState = this.hasLocalData()
       ? vscode.TreeItemCollapsibleState.Expanded
-      : vscode.TreeItemCollapsibleState.None; // Keep expanded if it has data, otherwise no expansion needed
+      : vscode.TreeItemCollapsibleState.None;
     this.localGroupNode = new CategoryGroupTreeItem(
-      this.localGroupNode.label!, // Reuse label
+      this.localGroupNode.label!,
       localCollapsibleState,
       false
     );
 
     const cloudCollapsibleState =
-      this.cloudPrompts.length > 0 || this.cloudCategoryNodes.size > 0 // Use the updated cloudCategoryNodes map size
+      this.cloudPrompts.length > 0 || this.cloudCategoryNodes.size > 0
         ? vscode.TreeItemCollapsibleState.Expanded
-        : vscode.TreeItemCollapsibleState.Collapsed; // Keep collapsed if empty
+        : vscode.TreeItemCollapsibleState.Collapsed;
     this.cloudGroupNode = new CategoryGroupTreeItem(
-      this.cloudGroupNode.label!, // Reuse label
+      this.cloudGroupNode.label!,
       cloudCollapsibleState,
       true
     );
@@ -212,16 +206,16 @@ export class MemoTreeViewModel {
 
   public getSortedLocalCategories(): CategoryTreeItem[] {
     return Array.from(this.localCategoryNodes.values()).sort((a, b) => {
-      const nameA = a.category?.name || "";
-      const nameB = b.category?.name || "";
+      const nameA = a.category.name;
+      const nameB = b.category.name;
       return nameA.localeCompare(nameB);
     });
   }
 
   public getSortedCloudCategories(): CategoryTreeItem[] {
     return Array.from(this.cloudCategoryNodes.values()).sort((a, b) => {
-      const nameA = a.category?.name || "";
-      const nameB = b.category?.name || "";
+      const nameA = a.category.name;
+      const nameB = b.category.name;
       return nameA.localeCompare(nameB);
     });
   }

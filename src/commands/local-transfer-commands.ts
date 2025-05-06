@@ -28,11 +28,18 @@ export function createExportPromptsHandler(
       return;
     }
 
+    // Filter out categories that have no prompts
+    const nonEmtpyCategories = categories.filter((category) =>
+      prompts.some((prompt) => prompt.categoryId === category.id)
+    );
+
     // Provide options to export selected categories or all
-    const options: QuickPickItem[] = categories.map((cat) => ({
+    const options: QuickPickItem[] = nonEmtpyCategories.map((cat) => ({
       label: cat.name,
       description:
-        cat.id === dataService.getDefaultCategoryId() ? "(Default)" : "",
+        cat.id === dataService.getDefaultCategoryId()
+          ? `(${LocalService.DEFAULT_CATEGORY})`
+          : "",
     }));
 
     const selectedQuickPickItems = await uiService.showQuickPick(options, {

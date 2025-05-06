@@ -40,6 +40,7 @@ import {
   createImportPromptsHandler,
 } from "./commands/local-transfer-commands";
 import { createPushToGitLabHandler } from "./commands/cloud-push-command";
+import { clearLocalStorageCommand } from "./commands/local-storage-command";
 import { createSearchAllPromptsHandler } from "./commands/search-commands";
 
 let memoTreeProvider: MemoTreeDataProvider;
@@ -55,7 +56,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Instantiate core services first
   const storageService = new VscodeStorageService(context);
   const configService = new ConfigurationService(context);
-  const uiService = new VSCodeUserInteractionService(); // Use class directly
+  const uiService = new VSCodeUserInteractionService();
 
   // Instantiate dependent services, injecting dependencies
   const localMemoService = new LocalService(storageService);
@@ -68,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
     gitlabApiService
   );
 
-  // Initialize both services (they load their respective data)
+  // Initialize both services
   await localMemoService.initialize();
   await cloudStoreService.initialize();
 
@@ -83,14 +84,13 @@ export async function activate(context: vscode.ExtensionContext) {
     showCollapseAll: true,
   });
   context.subscriptions.push(memoTreeView);
-  context.subscriptions.push(memoTreeProvider); // Ensure provider is disposed
+  context.subscriptions.push(memoTreeProvider);
 
   // Set the command to be executed when a memo item is clicked (no change needed)
   memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
   // Register Commands
   const commands: { [key: string]: (...args: any[]) => Promise<void> } = {
-    // Local Commands
     "cursor-memo.savePrompt": createSavePromptHandler(
       localMemoService,
       uiService
@@ -108,8 +108,6 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-
-    // Category Commands
     "cursor-memo.addCategory": createAddCategoryHandler(
       localMemoService,
       uiService
@@ -130,8 +128,6 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-
-    // Cloud/GitLab Commands
     "cursor-memo.removeCloudCategory": createRemoveCloudCategoryHandler(
       cloudStoreService,
       uiService
@@ -149,8 +145,6 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-
-    // Data Transfer Commands
     "cursor-memo.exportPrompts": createExportPromptsHandler(
       localMemoService,
       uiService
@@ -159,33 +153,10 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-
-    // New command to clear local storage
-    "cursor-memo.clearLocalStorage": async () => {
-      const confirmSelection =
-        await uiService.showQuickPick<vscode.QuickPickItem>(
-          [{ label: "Yes" }, { label: "No" }],
-          {
-            placeHolder:
-              "Are you sure you want to clear all local memo data? This cannot be undone.",
-          }
-        );
-
-      if (confirmSelection && confirmSelection.label === "Yes") {
-        try {
-          await localMemoService.clearAllLocalData();
-          vscode.window.showInformationMessage(
-            "Local memo storage has been cleared."
-          );
-        } catch (error: any) {
-          vscode.window.showErrorMessage(
-            `Error clearing local storage: ${error.message || error}`
-          );
-        }
-      }
-    },
-
-    // Search All Prompts command
+    "cursor-memo.clearLocalStorage": clearLocalStorageCommand(
+      localMemoService,
+      uiService
+    ),
     "cursor-memo.searchAllPrompts": createSearchAllPromptsHandler(
       localMemoService,
       cloudStoreService,
@@ -193,7 +164,6 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   };
 
-  // Register all commands
   for (const commandId in commands) {
     context.subscriptions.push(
       vscode.commands.registerCommand(commandId, commands[commandId])

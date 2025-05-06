@@ -22,7 +22,7 @@ export class CloudService {
   private static GITLAB_TOKEN_KEY = "cursor-cloud-gitlab-token";
   private static CLOUD_PROMPTS_KEY = "cursor-cloud-prompts";
   private static CLOUD_CATEGORIES_KEY = "cursor-cloud-categories";
-  private static DEFAULT_CATEGORY = "General";
+  public static DEFAULT_CATEGORY = "__uncategorized__";
 
   private _onDidCloudPromptsChange = new vscode.EventEmitter<void>();
   readonly onDidCloudPromptsChange: vscode.Event<void> =

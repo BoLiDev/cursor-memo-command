@@ -210,7 +210,7 @@ export class LocalTransferService {
       Object.entries(prompts).forEach(([alias, promptObj]) => {
         const prompt = promptObj.content;
         const label = prompt.length > 30 ? `${prompt.slice(0, 30)}...` : prompt;
-        const categoryId = categoryName; // Assume name is ID for import
+        const categoryId = categoryName;
 
         items.push({
           id: `cmd_${now}_${Math.random().toString().slice(2)}`,
