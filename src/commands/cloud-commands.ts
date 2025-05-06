@@ -8,7 +8,7 @@ import { VSCodeUserInteractionService } from "../services/vscode-user-interactio
 /**
  * Creates the remove cloud category handler.
  * Allows removing a cloud category locally without affecting remote data.
- * @param cloudStoreService The service managing cloud command state
+ * @param cloudStoreService The service managing cloud prompt state
  * @param uiService The user interaction service
  * @returns The remove cloud category handler function
  */
@@ -35,7 +35,7 @@ export function createRemoveCloudCategoryHandler(
 
     if (result.success) {
       await uiService.showInformationMessage(
-        `Removed cloud category "${categoryItem.category.name}" from local storage. ${result.removedCommands} command(s) removed.`
+        `Removed cloud category "${categoryItem.category.name}" from local storage. ${result.removedPrompts} prompt(s) removed.`
       );
     } else {
       await uiService.showErrorMessage(
@@ -46,10 +46,10 @@ export function createRemoveCloudCategoryHandler(
 }
 
 /**
- * Creates the sync from GitLab command handler
- * @param cloudStoreService The service managing cloud command state
+ * Creates the sync from GitLab prompt handler
+ * @param cloudStoreService The service managing cloud prompt state
  * @param uiService The user interaction service
- * @returns The sync from GitLab command handler function
+ * @returns The sync from GitLab prompt handler function
  */
 export function createSyncFromGitLabHandler(
   cloudStoreService: CloudService,
@@ -121,7 +121,7 @@ export function createSyncFromGitLabHandler(
       if (syncResult.success) {
         // Use void operator to ensure message doesn't block function execution
         void uiService.showInformationMessage(
-          `Synced ${syncResult.data.syncedCommands} command(s) from selected GitLab categories.`
+          `Synced ${syncResult.data.syncedPrompts} prompt(s) from selected GitLab categories.`
         );
       } else {
         if (syncResult.needsAuth) {
@@ -147,10 +147,10 @@ export function createSyncFromGitLabHandler(
 }
 
 /**
- * Creates the manage GitLab token command handler
- * @param cloudStoreService The service managing cloud command state (and token storage)
+ * Creates the manage GitLab token prompt handler
+ * @param cloudStoreService The service managing cloud prompt state (and token storage)
  * @param uiService The user interaction service
- * @returns The manage GitLab token command handler function
+ * @returns The manage GitLab token prompt handler function
  */
 export function createManageGitLabTokenHandler(
   cloudStoreService: CloudService,

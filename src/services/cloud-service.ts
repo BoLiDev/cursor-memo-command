@@ -2,41 +2,37 @@
 
 import * as vscode from "vscode";
 import * as os from "os";
-import { MemoItem } from "../models/memo-item";
-import {
-  parseCommands,
-  serializeCommands,
-  CommandsStructureSchema,
-} from "../zod";
+import { Prompt } from "../models/prompt";
+import { parsePrompts, serializePrompts, PromptsStructureSchema } from "../zod";
 import { VscodeStorageService } from "./vscode-storage-service";
 import { ConfigurationService } from "./configuration-service";
 import { GitlabApiService, GitlabApiError } from "./cloud-api-service";
 import { z } from "zod";
-import { removeDuplicateCommands as utilsRemoveDuplicateCommands } from "../utils";
+import { removeDuplicatePrompts } from "../utils";
 
 export type CloudOperationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string; needsAuth?: boolean };
 
 /**
- * Manages the state of cloud-synchronized commands.
+ * Manages the state of cloud-synchronized prompts.
  * Interacts with GitlabApiService to fetch/push data and StorageService to persist state.
  */
 export class CloudService {
-  private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
-  private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
-  private static CLOUD_CATEGORIES_KEY = "cursor-memo-cloud-categories";
-  private static DEFAULT_CATEGORY = "Default";
+  private static GITLAB_TOKEN_KEY = "cursor-cloud-gitlab-token";
+  private static CLOUD_PROMPTS_KEY = "cursor-cloud-prompts";
+  private static CLOUD_CATEGORIES_KEY = "cursor-cloud-categories";
+  private static DEFAULT_CATEGORY = "General";
 
-  private _onDidCloudCommandsChange = new vscode.EventEmitter<void>();
-  readonly onDidCloudCommandsChange: vscode.Event<void> =
-    this._onDidCloudCommandsChange.event;
+  private _onDidCloudPromptsChange = new vscode.EventEmitter<void>();
+  readonly onDidCloudPromptsChange: vscode.Event<void> =
+    this._onDidCloudPromptsChange.event;
 
   private _onDidCloudCategoriesChange = new vscode.EventEmitter<void>();
   readonly onDidCloudCategoriesChange: vscode.Event<void> =
     this._onDidCloudCategoriesChange.event;
 
-  private cloudCommands: MemoItem[] = [];
+  private cloudPrompts: Prompt[] = [];
   private cloudCategories: string[] = [];
   private initialized: boolean = false;
 
@@ -47,22 +43,22 @@ export class CloudService {
   ) {}
 
   /**
-   * Initialize the service by loading stored cloud commands.
+   * Initialize the service by loading stored cloud prompts.
    */
   public async initialize(): Promise<void> {
     if (this.initialized) {
       return;
     }
-    await this.loadCloudCommands();
+    await this.loadCloudPrompts();
     await this.loadCloudCategories();
     this.initialized = true;
   }
 
   /**
-   * Get all currently stored cloud commands.
+   * Get all currently stored cloud prompts.
    */
-  public getCloudCommands(): MemoItem[] {
-    return [...this.cloudCommands];
+  public getCloudPrompts(): Prompt[] {
+    return [...this.cloudPrompts];
   }
 
   /**
@@ -80,45 +76,44 @@ export class CloudService {
   }
 
   /**
-   * Parses the command data string and transforms it into MemoItems.
+   * Parses the prompt data string and transforms it into MemoItems.
    * @param decodedContent The raw string content from GitLab.
-   * @returns An object containing the parsed commands structure and the transformed MemoItems array.
+   * @returns An object containing the parsed prompts structure and the transformed MemoItems array.
    * @throws If parsing or validation fails.
    */
-  private _parseAndTransformCommands(decodedContent: string): {
-    commandsData: z.infer<typeof CommandsStructureSchema>;
-    commands: Omit<MemoItem, "isCloud">[];
+  private _parseAndTransformPrompts(decodedContent: string): {
+    promptsData: z.infer<typeof PromptsStructureSchema>;
+    prompts: Omit<Prompt, "isCloud">[];
   } {
-    const commandsData = parseCommands(decodedContent);
+    const promptsData = parsePrompts(decodedContent);
     const now = Date.now();
-    const items: Omit<MemoItem, "isCloud">[] = [];
+    const items: Omit<Prompt, "isCloud">[] = [];
 
-    Object.entries(commandsData).forEach(([categoryName, commands]) => {
-      Object.entries(commands).forEach(([alias, commandObj]) => {
-        const command = commandObj.content;
-        const label =
-          command.length > 30 ? `${command.slice(0, 30)}...` : command;
+    Object.entries(promptsData).forEach(([categoryName, prompts]) => {
+      Object.entries(prompts).forEach(([alias, promptObj]) => {
+        const prompt = promptObj.content;
+        const label = prompt.length > 30 ? `${prompt.slice(0, 30)}...` : prompt;
         const categoryId = categoryName;
 
         items.push({
           id: `cmd_${now}_${Math.random().toString().slice(2)}`,
           label,
-          command,
+          content: prompt,
           timestamp: now,
           alias,
           categoryId: categoryId,
         });
       });
     });
-    return { commandsData, commands: items };
+    return { promptsData, prompts: items };
   }
 
   /**
-   * Fetches, decodes, parses, and validates team commands from GitLab.
+   * Fetches, decodes, parses, and validates team prompts from GitLab.
    * Does not update internal state.
    */
-  private async fetchAndParseTeamCommands(): Promise<
-    CloudOperationResult<{ commands: MemoItem[]; categories: string[] }>
+  private async fetchAndParseTeamPrompts(): Promise<
+    CloudOperationResult<{ prompts: Prompt[]; categories: string[] }>
   > {
     try {
       const fileData = await this.gitlabApiService.getFileContent();
@@ -135,17 +130,17 @@ export class CloudService {
       );
 
       try {
-        const { commandsData, commands } =
-          this._parseAndTransformCommands(decodedContent);
-        const categories = Object.keys(commandsData);
+        const { promptsData, prompts } =
+          this._parseAndTransformPrompts(decodedContent);
+        const categories = Object.keys(promptsData);
         return {
           success: true,
-          data: { commands: commands as MemoItem[], categories },
+          data: { prompts: prompts as Prompt[], categories },
         };
       } catch (parseError: any) {
         return {
           success: false,
-          error: `Invalid command data: ${parseError.message}`,
+          error: `Invalid prompt data: ${parseError.message}`,
         };
       }
     } catch (error) {
@@ -155,24 +150,24 @@ export class CloudService {
       const message =
         error instanceof Error
           ? error.message
-          : "Unknown error fetching team commands";
+          : "Unknown error fetching team prompts";
       return { success: false, error: message };
     }
   }
 
   /**
-   * Fetches all commands from GitLab and updates the local cloud state.
+   * Fetches all prompts from GitLab and updates the local cloud state.
    */
   public async syncAllFromGitLab(): Promise<
-    CloudOperationResult<{ syncedCommands: number }>
+    CloudOperationResult<{ syncedPrompts: number }>
   > {
-    const fetchResult = await this.fetchAndParseTeamCommands();
+    const fetchResult = await this.fetchAndParseTeamPrompts();
 
     if (!fetchResult.success) {
       return fetchResult;
     }
 
-    this.cloudCommands = fetchResult.data.commands.map((cmd) => ({
+    this.cloudPrompts = fetchResult.data.prompts.map((cmd) => ({
       ...cmd,
       isCloud: true,
     }));
@@ -180,68 +175,68 @@ export class CloudService {
     // Update cloud categories
     this.cloudCategories = fetchResult.data.categories;
 
-    await this.saveCloudCommands();
+    await this.saveCloudPrompts();
     await this.saveCloudCategories();
 
-    this._onDidCloudCommandsChange.fire();
+    this._onDidCloudPromptsChange.fire();
     this._onDidCloudCategoriesChange.fire();
 
     return {
       success: true,
-      data: { syncedCommands: this.cloudCommands.length },
+      data: { syncedPrompts: this.cloudPrompts.length },
     };
   }
 
   /**
-   * Fetches commands from GitLab, filters by selected categories, and updates local cloud state.
+   * Fetches prompts from GitLab, filters by selected categories, and updates local cloud state.
    */
   public async syncSelectedFromGitLab(
     selectedCategories: string[]
-  ): Promise<CloudOperationResult<{ syncedCommands: number }>> {
-    const fetchResult = await this.fetchAndParseTeamCommands();
+  ): Promise<CloudOperationResult<{ syncedPrompts: number }>> {
+    const fetchResult = await this.fetchAndParseTeamPrompts();
 
     if (!fetchResult.success) {
       return fetchResult;
     }
 
-    const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
-    const filteredCommands = allImportedCommands.filter((cmd) =>
+    const allImportedPrompts: Prompt[] = fetchResult.data.prompts || [];
+    const filteredPrompts = allImportedPrompts.filter((cmd) =>
       selectedCategories.includes(
         cmd.categoryId || CloudService.DEFAULT_CATEGORY
       )
     );
 
-    // Get all new commands and mark them as cloud commands
-    const newCloudCommands = filteredCommands.map((cmd) => ({
+    // Get all new prompts and mark them as cloud prompts
+    const newCloudPrompts = filteredPrompts.map((cmd) => ({
       ...cmd,
       isCloud: true,
     }));
 
-    // Remove commands that conflict with selected categories from existing cloud commands
-    const existingCommands = this.cloudCommands.filter(
+    // Remove prompts that conflict with selected categories from existing cloud prompts
+    const existingPrompts = this.cloudPrompts.filter(
       (cmd) =>
         !selectedCategories.includes(
           cmd.categoryId || CloudService.DEFAULT_CATEGORY
         )
     );
 
-    // Merge existing commands with new commands
-    this.cloudCommands = [...existingCommands, ...newCloudCommands];
+    // Merge existing prompts with new prompts
+    this.cloudPrompts = [...existingPrompts, ...newCloudPrompts];
 
     // Update cloud categories with new selected categories
     this.cloudCategories = [
       ...new Set([...this.cloudCategories, ...selectedCategories]),
     ];
 
-    await this.saveCloudCommands();
+    await this.saveCloudPrompts();
     await this.saveCloudCategories();
 
-    this._onDidCloudCommandsChange.fire();
+    this._onDidCloudPromptsChange.fire();
     this._onDidCloudCategoriesChange.fire();
 
     return {
       success: true,
-      data: { syncedCommands: newCloudCommands.length },
+      data: { syncedPrompts: newCloudPrompts.length },
     };
   }
 
@@ -251,7 +246,7 @@ export class CloudService {
   public async fetchAvailableCategories(): Promise<
     CloudOperationResult<string[]>
   > {
-    const fetchResult = await this.fetchAndParseTeamCommands();
+    const fetchResult = await this.fetchAndParseTeamPrompts();
     if (!fetchResult.success) {
       return fetchResult;
     }
@@ -259,17 +254,17 @@ export class CloudService {
   }
 
   /**
-   * Removes a cloud category and its associated commands from the local cloud state.
+   * Removes a cloud category and its associated prompts from the local cloud state.
    */
   public async removeCloudCategory(categoryName: string): Promise<{
     success: boolean;
-    removedCommands: number;
+    removedPrompts: number;
   }> {
-    const originalLength = this.cloudCommands.length;
-    this.cloudCommands = this.cloudCommands.filter(
+    const originalLength = this.cloudPrompts.length;
+    this.cloudPrompts = this.cloudPrompts.filter(
       (cmd) => cmd.categoryId !== categoryName
     );
-    const removedCount = originalLength - this.cloudCommands.length;
+    const removedCount = originalLength - this.cloudPrompts.length;
 
     // Remove from cloud categories list
     this.cloudCategories = this.cloudCategories.filter(
@@ -277,42 +272,42 @@ export class CloudService {
     );
 
     if (removedCount > 0) {
-      await this.saveCloudCommands();
+      await this.saveCloudPrompts();
       await this.saveCloudCategories();
-      this._onDidCloudCommandsChange.fire();
+      this._onDidCloudPromptsChange.fire();
       this._onDidCloudCategoriesChange.fire();
-      return { success: true, removedCommands: removedCount };
+      return { success: true, removedPrompts: removedCount };
     } else {
-      // Even if no commands were removed, the category might have been removed
+      // Even if no prompts were removed, the category might have been removed
       await this.saveCloudCategories();
       this._onDidCloudCategoriesChange.fire();
-      return { success: true, removedCommands: 0 };
+      return { success: true, removedPrompts: 0 };
     }
   }
 
   /**
-   * Pushes specified commands to GitLab by creating a merge request.
-   * Merges provided commands with the current remote state before pushing.
-   * @param commandsToPush Array of MemoItems to add/update in GitLab.
+   * Pushes specified prompts to GitLab by creating a merge request.
+   * Merges provided prompts with the current remote state before pushing.
+   * @param promptsToPush Array of MemoItems to add/update in GitLab.
    * @param involvedCategories List of category IDs/names involved (for commit/MR message).
    */
-  public async pushCommandsToGitLab(
-    commandsToPush: MemoItem[],
+  public async pushPromptsToGitLab(
+    promptsToPush: Prompt[],
     involvedCategories: string[]
   ): Promise<
-    CloudOperationResult<{ mergeRequestUrl: string; pushedCommands: number }>
+    CloudOperationResult<{ mergeRequestUrl: string; pushedPrompts: number }>
   > {
-    if (commandsToPush.length === 0) {
-      return { success: false, error: "No commands selected for pushing." };
+    if (promptsToPush.length === 0) {
+      return { success: false, error: "No prompts selected for pushing." };
     }
 
     try {
       // 1. Fetch current remote state
-      const fetchResult = await this.fetchAndParseTeamCommands();
+      const fetchResult = await this.fetchAndParseTeamPrompts();
 
-      let remoteCommands: MemoItem[] = [];
+      let remotePrompts: Prompt[] = [];
       if (fetchResult.success) {
-        remoteCommands = fetchResult.data.commands;
+        remotePrompts = fetchResult.data.prompts;
       } else if (fetchResult.needsAuth) {
         return fetchResult;
       } else if (fetchResult.error && !fetchResult.error.includes("404")) {
@@ -323,19 +318,19 @@ export class CloudService {
       }
 
       // 2. Merge and prepare new content
-      const allCommands = [...remoteCommands, ...commandsToPush];
-      const processedCommands = allCommands.map((cmd) => ({
+      const allPrompts = [...remotePrompts, ...promptsToPush];
+      const processedPrompts = allPrompts.map((cmd) => ({
         ...cmd,
         alias: cmd.alias || cmd.label,
       }));
-      const uniqueCommands = utilsRemoveDuplicateCommands(processedCommands);
-      const commandsData = this._transformMemoItemsToStructure(uniqueCommands);
-      const newFileContent = serializeCommands(commandsData);
+      const uniquePrompts = removeDuplicatePrompts(processedPrompts);
+      const promptsData = this._transformMemoItemsToStructure(uniquePrompts);
+      const newFileContent = serializePrompts(promptsData);
       const newFileContentBase64 =
         Buffer.from(newFileContent).toString("base64");
 
-      const newCommandsCount = uniqueCommands.length - remoteCommands.length;
-      const updatedCount = commandsToPush.length - newCommandsCount;
+      const newPromptsCount = uniquePrompts.length - remotePrompts.length;
+      const updatedCount = promptsToPush.length - newPromptsCount;
 
       // 3. Create Branch
       const timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
@@ -344,7 +339,7 @@ export class CloudService {
 
       // 4. Commit File
       const filePath = this.configService.getGitlabFilePath();
-      const commitMessage = `Update prompt commands: added ${newCommandsCount} new, updated ${updatedCount}.`;
+      const commitMessage = `Update prompt content: added ${newPromptsCount} new, updated ${updatedCount}.`;
       await this.gitlabApiService.commitFileChange(
         branchName,
         filePath,
@@ -354,8 +349,8 @@ export class CloudService {
 
       // 5. Create Merge Request
       const targetBranch = this.configService.getGitlabBranch();
-      const mrTitle = `Update prompt commands from ${os.hostname() || "local"}`;
-      const mrDescription = `This merge request adds ${newCommandsCount} new command(s) and updates ${updatedCount} existing command(s) from categories: ${involvedCategories.join(", ")}.`;
+      const mrTitle = `Update prompts from ${os.hostname() || "local"}`;
+      const mrDescription = `This merge request adds ${newPromptsCount} new prompt(s) and updates ${updatedCount} existing prompt(s) from categories: ${involvedCategories.join(", ")}.`;
       const mrResult = await this.gitlabApiService.createMergeRequest(
         branchName,
         targetBranch,
@@ -367,7 +362,7 @@ export class CloudService {
         success: true,
         data: {
           mergeRequestUrl: mrResult.web_url,
-          pushedCommands: commandsToPush.length,
+          pushedPrompts: promptsToPush.length,
         },
       };
     } catch (error) {
@@ -396,19 +391,22 @@ export class CloudService {
     await this.storageService.deleteSecret(CloudService.GITLAB_TOKEN_KEY);
   }
 
-  private async saveCloudCommands(): Promise<void> {
+  private async saveCloudPrompts(): Promise<void> {
     await this.storageService.setValue(
-      CloudService.CLOUD_COMMANDS_KEY,
-      this.cloudCommands
+      CloudService.CLOUD_PROMPTS_KEY,
+      this.cloudPrompts
     );
   }
 
-  private async loadCloudCommands(): Promise<void> {
-    const stored = this.storageService.getValue<MemoItem[]>(
-      CloudService.CLOUD_COMMANDS_KEY,
+  private async loadCloudPrompts(): Promise<void> {
+    const stored = this.storageService.getValue<Prompt[]>(
+      CloudService.CLOUD_PROMPTS_KEY,
       []
     );
-    this.cloudCommands = stored.map((cmd) => ({ ...cmd, isCloud: true }));
+    this.cloudPrompts = stored.map((cmd: Prompt) => ({
+      ...cmd,
+      isCloud: true,
+    }));
   }
 
   /**
@@ -430,17 +428,17 @@ export class CloudService {
       []
     );
 
-    // Ensure we also add any categories from the commands
-    const categoriesFromCommands = new Set<string>();
-    this.cloudCommands.forEach((cmd) => {
+    // Ensure we also add any categories from the prompts
+    const categoriesFromPrompts = new Set<string>();
+    this.cloudPrompts.forEach((cmd) => {
       if (cmd.categoryId) {
-        categoriesFromCommands.add(cmd.categoryId);
+        categoriesFromPrompts.add(cmd.categoryId);
       }
     });
 
-    if (categoriesFromCommands.size > 0) {
+    if (categoriesFromPrompts.size > 0) {
       this.cloudCategories = [
-        ...new Set([...this.cloudCategories, ...categoriesFromCommands]),
+        ...new Set([...this.cloudCategories, ...categoriesFromPrompts]),
       ];
       await this.saveCloudCategories();
     }
@@ -449,16 +447,16 @@ export class CloudService {
   /**
    * Transforms an array of MemoItems into the nested structure expected by GitLab/export format.
    * @param items The MemoItem array.
-   * @returns The nested command structure.
+   * @returns The nested prompt structure.
    */
   private _transformMemoItemsToStructure(
-    items: MemoItem[]
-  ): z.infer<typeof CommandsStructureSchema> {
-    const result: z.infer<typeof CommandsStructureSchema> = {};
+    items: Prompt[]
+  ): z.infer<typeof PromptsStructureSchema> {
+    const result: z.infer<typeof PromptsStructureSchema> = {};
 
     items.forEach((item) => {
       const categoryName = item.categoryId;
-      const alias = item.alias || item.label || "Unnamed Command";
+      const alias = item.alias || item.label || "Unnamed Prompt";
 
       if (!result[categoryName]) {
         result[categoryName] = {};
@@ -466,7 +464,7 @@ export class CloudService {
 
       if (!result[categoryName][alias]) {
         result[categoryName][alias] = {
-          content: item.command,
+          content: item.content,
         };
       }
     });

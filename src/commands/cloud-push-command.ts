@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { CloudService } from "../services/cloud-service";
 import { LocalService } from "../services/local-service";
-import { MemoItem } from "../models/memo-item";
+import { Prompt } from "../models/prompt";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 import { QuickPickItem } from "vscode";
 
@@ -20,39 +20,39 @@ export function createPushToGitLabHandler(
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    const localCommands = localMemoService.getCommands();
+    const localPrompts = localMemoService.getPrompts();
 
-    if (localCommands.length === 0) {
+    if (localPrompts.length === 0) {
       await uiService.showInformationMessage(
-        "No local commands available to push"
+        "No local prompts available to push"
       );
       return;
     }
 
     // Define type for QuickPick items that hold MemoItem data
     type MemoQuickPickItem = QuickPickItem & {
-      command?: MemoItem;
+      prompt?: Prompt;
       isSeparator?: boolean;
     };
 
-    // Group commands by category for display
+    // Group prompts by category for display
     const quickPickItems: MemoQuickPickItem[] = [];
 
-    // Create a mapping of category to commands for display
-    const commandsByCategory: { [categoryId: string]: MemoItem[] } = {};
+    // Create a mapping of category to prompts for display
+    const promptsByCategory: { [categoryId: string]: Prompt[] } = {};
     const categoryMap = new Map(
       localMemoService.getCategories().map((cat) => [cat.id, cat.name])
     );
 
-    localCommands.forEach((cmd) => {
-      if (!commandsByCategory[cmd.categoryId]) {
-        commandsByCategory[cmd.categoryId] = [];
+    localPrompts.forEach((prompt) => {
+      if (!promptsByCategory[prompt.categoryId]) {
+        promptsByCategory[prompt.categoryId] = [];
       }
-      commandsByCategory[cmd.categoryId].push(cmd);
+      promptsByCategory[prompt.categoryId].push(prompt);
     });
 
     // Sort categories by name for display
-    const sortedCategoryIds = Object.keys(commandsByCategory).sort((a, b) => {
+    const sortedCategoryIds = Object.keys(promptsByCategory).sort((a, b) => {
       const nameA = categoryMap.get(a) || a;
       const nameB = categoryMap.get(b) || b;
       return nameA.localeCompare(nameB);
@@ -67,22 +67,22 @@ export function createPushToGitLabHandler(
         isSeparator: true,
       });
 
-      // Add all commands in this category
-      commandsByCategory[categoryId].forEach((cmd) => {
+      // Add all prompts in this category
+      promptsByCategory[categoryId].forEach((prompt) => {
         quickPickItems.push({
-          label: `$(terminal) ${cmd.alias || cmd.label}`,
+          label: `$(terminal) ${prompt.alias || prompt.label}`,
           description: categoryName,
           detail:
-            cmd.command.length > 60
-              ? `${cmd.command.substring(0, 60)}...`
-              : cmd.command,
-          command: cmd,
+            prompt.content.length > 60
+              ? `${prompt.content.substring(0, 60)}...`
+              : prompt.content,
+          prompt: prompt,
         });
       });
     });
 
     const selectedItems = await uiService.showQuickPick(quickPickItems, {
-      placeHolder: "Select commands to push to GitLab",
+      placeHolder: "Select prompts to push to GitLab",
       canPickMany: true,
     });
 
@@ -90,22 +90,22 @@ export function createPushToGitLabHandler(
       return;
     }
 
-    // Filter out separator items and only keep actual command items
-    const commandsToUpload = selectedItems
+    // Filter out separator items and only keep actual prompt items
+    const promptsToUpload = selectedItems
       .filter(
-        (item): item is MemoQuickPickItem & { command: MemoItem } =>
-          !item.isSeparator && !!item.command
+        (item): item is MemoQuickPickItem & { prompt: Prompt } =>
+          !item.isSeparator && !!item.prompt
       )
-      .map((item) => item.command);
+      .map((item) => item.prompt);
 
-    if (commandsToUpload.length === 0) {
-      await uiService.showInformationMessage("No commands selected");
+    if (promptsToUpload.length === 0) {
+      await uiService.showInformationMessage("No prompts selected");
       return;
     }
 
     // Get unique category IDs involved
     const involvedCategoryIds = [
-      ...new Set(commandsToUpload.map((cmd) => cmd.categoryId)),
+      ...new Set(promptsToUpload.map((cmd) => cmd.categoryId)),
     ];
     // Get category names for the message
     const involvedCategoryNames = involvedCategoryIds.map(
@@ -113,7 +113,7 @@ export function createPushToGitLabHandler(
     );
 
     // Confirm upload
-    const confirmMessage = `Push ${commandsToUpload.length} command(s) from categories [${involvedCategoryNames.join(", ")}] to GitLab as a new Merge Request?`;
+    const confirmMessage = `Push ${promptsToUpload.length} prompt(s) from categories [${involvedCategoryNames.join(", ")}] to GitLab as a new Merge Request?`;
     const confirmResultItem = await uiService.showInformationMessage(
       confirmMessage,
       { modal: true },
@@ -131,20 +131,20 @@ export function createPushToGitLabHandler(
         cancellable: false,
       },
       async (progress) => {
-        progress.report({ message: "Preparing commands..." });
+        progress.report({ message: "Preparing prompts..." });
 
         try {
           progress.report({ message: "Creating merge request..." });
 
           // Pass category IDs to the service
-          const result = await cloudStoreService.pushCommandsToGitLab(
-            commandsToUpload,
+          const result = await cloudStoreService.pushPromptsToGitLab(
+            promptsToUpload,
             involvedCategoryIds
           );
 
           if (result.success) {
             const openMrAction = { title: "Open Merge Request" };
-            const message = `Successfully pushed ${result.data.pushedCommands} commands to GitLab as a merge request.`;
+            const message = `Successfully pushed ${result.data.pushedPrompts} prompts to GitLab as a merge request.`;
 
             const selection = await uiService.showInformationMessage(
               message,

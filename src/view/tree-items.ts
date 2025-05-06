@@ -13,7 +13,7 @@ export class CategoryGroupTreeItem extends vscode.TreeItem {
     public readonly isCloud: boolean
   ) {
     super(label, collapsibleState);
-    this.tooltip = `${this.label} Commands`;
+    this.tooltip = `${this.label} Prompts`;
     this.description = this.isCloud ? "Synced from GitLab" : "Stored locally";
     this.contextValue = this.isCloud ? "cloudGroup" : "localGroup";
     this.iconPath = new vscode.ThemeIcon(this.isCloud ? "cloud" : "library");

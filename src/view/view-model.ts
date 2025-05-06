@@ -1,7 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { MemoItem } from "../models/memo-item";
+import { Prompt } from "../models/prompt";
 import { LocalService } from "../services/local-service";
 import { CloudService } from "../services/cloud-service";
 import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
@@ -11,8 +11,8 @@ import { Category } from "../models/category";
  * Manages the data state for the TreeView
  */
 export class MemoTreeViewModel {
-  private localCommands: MemoItem[] = [];
-  private cloudCommands: MemoItem[] = [];
+  private localPrompts: Prompt[] = [];
+  private cloudPrompts: Prompt[] = [];
   private localCategories: Category[] = [];
   private cloudCategoriesIds: string[] = [];
 
@@ -54,13 +54,13 @@ export class MemoTreeViewModel {
     );
 
     this.disposables.push(
-      this.localDataService.onDidCommandsChange(() => {
+      this.localDataService.onDidPromptsChange(() => {
         this.update();
       }),
       this.localDataService.onDidCategoriesChange(() => {
         this.update();
       }),
-      this.cloudStoreService.onDidCloudCommandsChange(() => {
+      this.cloudStoreService.onDidCloudPromptsChange(() => {
         this.update();
       }),
       this.cloudStoreService.onDidCloudCategoriesChange(() => {
@@ -76,8 +76,8 @@ export class MemoTreeViewModel {
    */
   public update(): void {
     // Fetch latest data
-    this.localCommands = this.localDataService.getCommands();
-    this.cloudCommands = this.cloudStoreService.getCloudCommands();
+    this.localPrompts = this.localDataService.getPrompts();
+    this.cloudPrompts = this.cloudStoreService.getCloudPrompts();
     this.localCategories = this.localDataService.getCategories();
     this.cloudCategoriesIds = this.cloudStoreService.getCloudCategories();
 
@@ -102,7 +102,7 @@ export class MemoTreeViewModel {
     const hasNonDefaultCategories = this.localCategories.some(
       (cat) => cat.id !== this.localDataService.getDefaultCategoryId()
     );
-    return this.localCommands.length > 0 || hasNonDefaultCategories;
+    return this.localPrompts.length > 0 || hasNonDefaultCategories;
   }
 
   /**
@@ -169,7 +169,7 @@ export class MemoTreeViewModel {
         id: catId,
         name:
           catId === this.cloudStoreService.getDefaultCategoryId()
-            ? "Default (Cloud)"
+            ? "General (Cloud)"
             : catId,
       };
 
@@ -192,7 +192,7 @@ export class MemoTreeViewModel {
     );
 
     const cloudCollapsibleState =
-      this.cloudCommands.length > 0 || this.cloudCategoryNodes.size > 0 // Use the updated cloudCategoryNodes map size
+      this.cloudPrompts.length > 0 || this.cloudCategoryNodes.size > 0 // Use the updated cloudCategoryNodes map size
         ? vscode.TreeItemCollapsibleState.Expanded
         : vscode.TreeItemCollapsibleState.Collapsed; // Keep collapsed if empty
     this.cloudGroupNode = new CategoryGroupTreeItem(
@@ -226,19 +226,19 @@ export class MemoTreeViewModel {
     });
   }
 
-  public getLocalCategoryItems(categoryId: string): MemoItem[] {
-    return this.localCommands
+  public getLocalCategoryItems(categoryId: string): Prompt[] {
+    return this.localPrompts
       .filter((item) => item.categoryId === categoryId)
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  public getCloudCategoryItems(categoryId: string): MemoItem[] {
-    return this.cloudCommands
+  public getCloudCategoryItems(categoryId: string): Prompt[] {
+    return this.cloudPrompts
       .filter((item) => item.categoryId === categoryId)
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  public getCategoryNodeForItem(item: MemoItem): CategoryTreeItem | undefined {
+  public getCategoryNodeForItem(item: Prompt): CategoryTreeItem | undefined {
     if (item.isCloud) {
       const prefixedId = this.getPrefixedCategoryId(item.categoryId, true);
       return this.cloudCategoryNodes.get(prefixedId);

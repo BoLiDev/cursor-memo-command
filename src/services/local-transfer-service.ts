@@ -1,12 +1,8 @@
 /** @format */
 
-import { MemoItem } from "../models/memo-item";
+import { Prompt } from "../models/prompt";
 import { LocalService } from "./local-service";
-import {
-  CommandsStructureSchema,
-  parseCommands,
-  serializeCommands,
-} from "../zod";
+import { PromptsStructureSchema, parsePrompts, serializePrompts } from "../zod";
 import { z } from "zod";
 import { Category } from "../models/category";
 import { filterOutDuplicates } from "../utils";
@@ -19,52 +15,52 @@ export class LocalTransferService {
 
   /**
    * Export all data as JSON string using the human-friendly format
-   * @returns JSON string of all commands organized by category and alias
+   * @returns JSON string of all prompts organized by category and alias
    */
   public exportData(): string {
-    const commands = this.localService.getCommands();
+    const prompts = this.localService.getPrompts();
     const categories = this.localService.getCategories();
-    const commandsData = this._transformMemoItemsToExportStructure(
-      commands,
+    const promptsData = this._transformMemoItemsToExportStructure(
+      prompts,
       categories
     );
-    return serializeCommands(commandsData);
+    return serializePrompts(promptsData);
   }
 
   /**
    * Export selected categories as JSON string using the human-friendly format
    * @param selectedCategories Array of category names to export
-   * @returns JSON string of selected categories and their commands
+   * @returns JSON string of selected categories and their prompts
    */
   public exportSelectedCategories(selectedCategories: string[]): string {
-    const filteredCommands = this.localService
-      .getCommands()
-      .filter((cmd) => selectedCategories.includes(cmd.categoryId));
+    const filteredPrompts = this.localService
+      .getPrompts()
+      .filter((prompt) => selectedCategories.includes(prompt.categoryId));
 
     const categories = this.localService.getCategories();
-    const commandsData = this._transformMemoItemsToExportStructure(
-      filteredCommands,
+    const promptsData = this._transformMemoItemsToExportStructure(
+      filteredPrompts,
       categories
     );
-    return serializeCommands(commandsData);
+    return serializePrompts(promptsData);
   }
 
   /**
    * Import data from JSON string
-   * @param jsonData JSON string of commands data in the new format
+   * @param jsonData JSON string of prompts data in the new format
    * @returns Promise with result of import operation
    */
   public async importData(jsonData: string): Promise<{
     success: boolean;
-    importedCommands: number;
-    duplicateCommands: number;
+    importedPrompts: number;
+    duplicatePrompts: number;
     importedCategories: number;
   }> {
     try {
-      const { commands, categoryNames } =
+      const { prompts, categoryNames } =
         this._parseAndTransformImportData(jsonData);
 
-      // 处理分类
+      // Handle categories
       const currentCategories = this.localService.getCategories();
       const currentCategoryIds = new Set(currentCategories.map((c) => c.id));
       const newCategoryNames = categoryNames.filter(
@@ -75,31 +71,31 @@ export class LocalTransferService {
         await this.localService.addCategories(newCategoryNames);
       }
 
-      // 获取当前命令，用于去重
-      const currentCommands = this.localService.getCommands();
+      // Get current prompts for deduplication
+      const currentPrompts = this.localService.getPrompts();
 
-      // 过滤掉重复的命令
-      const uniqueCommands = filterOutDuplicates(commands, currentCommands);
-      const duplicateCount = commands.length - uniqueCommands.length;
+      // Filter out duplicate prompts
+      const uniquePrompts = filterOutDuplicates(prompts, currentPrompts);
+      const duplicateCount = prompts.length - uniquePrompts.length;
 
-      // 处理命令
+      // Handle prompts
       let addedCount = 0;
-      if (uniqueCommands.length > 0) {
-        const result = await this.localService.addCommands(uniqueCommands);
+      if (uniquePrompts.length > 0) {
+        const result = await this.localService.addPrompts(uniquePrompts);
         addedCount = result.added;
       }
 
       return {
         success: true,
-        importedCommands: addedCount,
-        duplicateCommands: duplicateCount,
+        importedPrompts: addedCount,
+        duplicatePrompts: duplicateCount,
         importedCategories: newCategoryNames.length,
       };
     } catch {
       return {
         success: false,
-        importedCommands: 0,
-        duplicateCommands: 0,
+        importedPrompts: 0,
+        duplicatePrompts: 0,
         importedCategories: 0,
       };
     }
@@ -107,7 +103,7 @@ export class LocalTransferService {
 
   /**
    * Import selected categories from JSON string
-   * @param jsonData JSON string of commands data in the new format
+   * @param jsonData JSON string of prompts data in the new format
    * @param selectedCategories Array of category names to import
    * @returns Promise with result of import operation
    */
@@ -116,29 +112,29 @@ export class LocalTransferService {
     selectedCategories: string[]
   ): Promise<{
     success: boolean;
-    importedCommands: number;
-    duplicateCommands: number;
+    importedPrompts: number;
+    duplicatePrompts: number;
     importedCategories: number;
   }> {
     try {
-      const { commandsData } = this._parseAndTransformImportData(jsonData);
+      const { promptsData } = this._parseAndTransformImportData(jsonData);
 
-      // 过滤出选中的分类
-      const filteredData: z.infer<typeof CommandsStructureSchema> = {};
-      Object.keys(commandsData)
+      // Filter out selected categories
+      const filteredData: z.infer<typeof PromptsStructureSchema> = {};
+      Object.keys(promptsData)
         .filter((categoryName) => selectedCategories.includes(categoryName))
         .forEach((categoryName) => {
-          filteredData[categoryName] = commandsData[categoryName];
+          filteredData[categoryName] = promptsData[categoryName];
         });
 
-      // 获取分类
+      // Get category names
       const categoryNamesFiltered = Object.keys(filteredData);
 
-      // 转换为内部格式
-      const commandsFiltered =
+      // Convert to internal format
+      const promptsFiltered =
         this._transformParsedDataToMemoItems(filteredData);
 
-      // 处理分类
+      // Handle categories
       const currentCategories = this.localService.getCategories();
       const currentCategoryIds = new Set(currentCategories.map((c) => c.id));
       const newCategoryNames = categoryNamesFiltered.filter(
@@ -149,78 +145,77 @@ export class LocalTransferService {
         await this.localService.addCategories(newCategoryNames);
       }
 
-      // 获取当前命令，用于去重
-      const currentCommands = this.localService.getCommands();
+      // Get current prompts for deduplication
+      const currentPrompts = this.localService.getPrompts();
 
-      // 过滤掉重复的命令
-      const uniqueCommands = filterOutDuplicates(
-        commandsFiltered,
-        currentCommands
+      // Filter out duplicate prompts
+      const uniquePrompts = filterOutDuplicates(
+        promptsFiltered,
+        currentPrompts
       );
-      const duplicateCount = commandsFiltered.length - uniqueCommands.length;
+      const duplicateCount = promptsFiltered.length - uniquePrompts.length;
 
-      // 处理命令
+      // Handle prompts
       let addedCount = 0;
-      if (uniqueCommands.length > 0) {
-        const result = await this.localService.addCommands(uniqueCommands);
+      if (uniquePrompts.length > 0) {
+        const result = await this.localService.addPrompts(uniquePrompts);
         addedCount = result.added;
       }
 
       return {
         success: true,
-        importedCommands: addedCount,
-        duplicateCommands: duplicateCount,
+        importedPrompts: addedCount,
+        duplicatePrompts: duplicateCount,
         importedCategories: newCategoryNames.length,
       };
     } catch {
       return {
         success: false,
-        importedCommands: 0,
-        duplicateCommands: 0,
+        importedPrompts: 0,
+        duplicatePrompts: 0,
         importedCategories: 0,
       };
     }
   }
 
   /**
-   * Parses the command data string and transforms it into MemoItems and category names.
+   * Parses the prompt data string and transforms it into MemoItems and category names.
    * @param jsonData The raw JSON string from the import file.
-   * @returns An object containing the parsed commands structure, the transformed MemoItems array, and category names.
+   * @returns An object containing the parsed prompts structure, the transformed MemoItems array, and category names.
    * @throws If parsing or validation fails.
    */
   private _parseAndTransformImportData(jsonData: string): {
-    commandsData: z.infer<typeof CommandsStructureSchema>;
-    commands: Omit<MemoItem, "isCloud">[];
+    promptsData: z.infer<typeof PromptsStructureSchema>;
+    prompts: Omit<Prompt, "isCloud">[];
     categoryNames: string[];
   } {
-    const commandsData = parseCommands(jsonData);
-    const commands = this._transformParsedDataToMemoItems(commandsData);
-    const categoryNames = Object.keys(commandsData);
-    return { commandsData, commands, categoryNames };
+    const promptsData = parsePrompts(jsonData);
+    const prompts = this._transformParsedDataToMemoItems(promptsData);
+    const categoryNames = Object.keys(promptsData);
+    return { promptsData, prompts, categoryNames };
   }
 
   /**
-   * Helper to transform parsed command data structure into MemoItems.
-   * @param commandsData Parsed command data.
+   * Helper to transform parsed prompt data structure into MemoItems.
+   * @param promptsData Parsed prompt data.
    * @returns Array of MemoItems (without isCloud property).
    */
   private _transformParsedDataToMemoItems(
-    commandsData: z.infer<typeof CommandsStructureSchema>
-  ): Omit<MemoItem, "isCloud">[] {
+    promptsData: z.infer<typeof PromptsStructureSchema>
+  ): Omit<Prompt, "isCloud">[] {
     const now = Date.now();
-    const items: Omit<MemoItem, "isCloud">[] = [];
+    const items: Omit<Prompt, "isCloud">[] = [];
 
-    Object.entries(commandsData).forEach(([categoryName, commands]) => {
-      Object.entries(commands).forEach(([alias, commandObj]) => {
-        const command = commandObj.content;
-        const label =
-          command.length > 30 ? `${command.slice(0, 30)}...` : command;
+    Object.entries(promptsData).forEach(([categoryName, prompts]) => {
+      Object.entries(prompts).forEach(([alias, promptObj]) => {
+        const prompt = promptObj.content;
+        const label = prompt.length > 30 ? `${prompt.slice(0, 30)}...` : prompt;
         const categoryId = categoryName; // Assume name is ID for import
 
         items.push({
           id: `cmd_${now}_${Math.random().toString().slice(2)}`,
           label,
-          command,
+          content: prompt,
           timestamp: now,
           alias,
           categoryId: categoryId,
@@ -235,18 +230,18 @@ export class LocalTransferService {
    * Uses the provided categories to map category IDs to names.
    * @param items The MemoItem array.
    * @param categories The Category array for ID-to-name mapping.
-   * @returns The nested command structure.
+   * @returns The nested prompt structure.
    */
   private _transformMemoItemsToExportStructure(
-    items: MemoItem[],
+    items: Prompt[],
     categories: Category[]
-  ): z.infer<typeof CommandsStructureSchema> {
-    const result: z.infer<typeof CommandsStructureSchema> = {};
+  ): z.infer<typeof PromptsStructureSchema> {
+    const result: z.infer<typeof PromptsStructureSchema> = {};
     const categoryMap = new Map(categories.map((cat) => [cat.id, cat.name]));
 
     items.forEach((item) => {
       const categoryName = categoryMap.get(item.categoryId) ?? item.categoryId; // Use map, fallback to ID
-      const alias = item.alias || item.label || "Unnamed Command";
+      const alias = item.alias || item.label || "Unnamed Prompt";
 
       if (!result[categoryName]) {
         result[categoryName] = {};
@@ -254,7 +249,7 @@ export class LocalTransferService {
 
       if (!result[categoryName][alias]) {
         result[categoryName][alias] = {
-          content: item.command,
+          content: item.content,
         };
       }
     });

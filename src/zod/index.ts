@@ -1,2 +1,2 @@
-export * from "./command-schema";
+export * from "./prompt-schema";
 export * from "./gitlab-schema";

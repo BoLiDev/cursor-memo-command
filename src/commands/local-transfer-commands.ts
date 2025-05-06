@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import { LocalService } from "../services/local-service";
 import { LocalTransferService } from "../services/local-transfer-service";
-import { parseCommands } from "../zod/command-schema";
+import { parsePrompts } from "../zod/prompt-schema";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 import { QuickPickItem } from "vscode";
 
@@ -20,11 +20,11 @@ export function createExportCommandsHandler(
 ): (...args: any[]) => Promise<void> {
   return async () => {
     const dataTransferService = new LocalTransferService(dataService);
-    const commands = dataService.getCommands();
+    const prompts = dataService.getPrompts();
     const categories = dataService.getCategories();
 
-    if (commands.length === 0) {
-      await uiService.showInformationMessage("No commands to export");
+    if (prompts.length === 0) {
+      await uiService.showInformationMessage("No prompts to export");
       return;
     }
 
@@ -54,11 +54,11 @@ export function createExportCommandsHandler(
       dataTransferService.exportSelectedCategories(selectedCategoryIds);
 
     const saveDialogOptions: vscode.SaveDialogOptions = {
-      defaultUri: vscode.Uri.file("cursor_commands.json"),
+      defaultUri: vscode.Uri.file("cursor_prompts.json"),
       filters: {
         JSON: ["json"],
       },
-      title: "Export Commands",
+      title: "Export Prompts",
     };
 
     const uri = await vscode.window.showSaveDialog(saveDialogOptions);
@@ -66,10 +66,10 @@ export function createExportCommandsHandler(
       try {
         fs.writeFileSync(uri.fsPath, exportData);
         await uiService.showInformationMessage(
-          `Commands exported to ${uri.fsPath}`
+          `Prompts exported to ${uri.fsPath}`
         );
       } catch (error) {
-        await uiService.showErrorMessage(`Error exporting commands: ${error}`);
+        await uiService.showErrorMessage(`Error exporting prompts: ${error}`);
       }
     }
   };
@@ -95,7 +95,7 @@ export function createImportCommandsHandler(
       filters: {
         JSON: ["json"],
       },
-      title: "Import Commands",
+      title: "Import Prompts",
     };
 
     const uris = await vscode.window.showOpenDialog(openDialogOptions);
@@ -104,12 +104,12 @@ export function createImportCommandsHandler(
         const fileContents = fs.readFileSync(uris[0].fsPath, "utf8");
 
         try {
-          const commandsData = parseCommands(fileContents);
-          const availableCategories = Object.keys(commandsData);
+          const promptsData = parsePrompts(fileContents);
+          const availableCategories = Object.keys(promptsData);
 
           if (availableCategories.length === 0) {
             await uiService.showInformationMessage(
-              "No commands found in the file to import."
+              "No prompts found in the file to import."
             );
             return;
           }
@@ -139,7 +139,7 @@ export function createImportCommandsHandler(
           );
         } catch (parseError) {
           await uiService.showErrorMessage(
-            `Invalid command data format: ${parseError}`
+            `Invalid prompt data format: ${parseError}`
           );
         }
       } catch (error) {
@@ -165,12 +165,12 @@ async function importSelectedData(
 
   if (result.success) {
     const message =
-      result.duplicateCommands > 0
-        ? `Imported ${result.importedCommands} commands and ${result.importedCategories} categories. Skipped ${result.duplicateCommands} duplicate commands.`
-        : `Imported ${result.importedCommands} commands and ${result.importedCategories} categories.`;
+      result.duplicatePrompts > 0
+        ? `Imported ${result.importedPrompts} prompts and ${result.importedCategories} categories. Skipped ${result.duplicatePrompts} duplicate prompts.`
+        : `Imported ${result.importedPrompts} prompts and ${result.importedCategories} categories.`;
 
     await uiService.showInformationMessage(message);
   } else {
-    await uiService.showErrorMessage("Failed to import commands");
+    await uiService.showErrorMessage("Failed to import prompts");
   }
 }

@@ -3,10 +3,10 @@
 /**
  * Data structure for memo items
  */
-export interface MemoItem {
+export interface Prompt {
   id: string;
   label: string;
-  command: string;
+  content: string;
   timestamp: number;
   alias?: string;
   categoryId: string;

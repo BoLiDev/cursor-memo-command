@@ -2,7 +2,7 @@
 
 import * as vscode from "vscode";
 import { LocalService } from "../services/local-service";
-import { MemoItem } from "../models/memo-item";
+import { Prompt } from "../models/prompt";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
 // TODO: Move directPaste to a suitable utility
@@ -32,19 +32,19 @@ export function createSaveCommandHandler(
       // ignore
     }
 
-    const commandText = await uiService.createMultilineInputBox(
-      "Save Command",
-      "Enter or paste the command content",
+    const promptContent = await uiService.createMultilineInputBox(
+      "Save Prompt",
+      "Enter or paste the prompt content",
       clipboardText
     );
 
-    if (commandText) {
-      const result = await dataService.addCommand(commandText);
+    if (promptContent) {
+      const result = await dataService.addPrompt(promptContent);
 
       if ("error" in result) {
         await uiService.showErrorMessage(result.error);
       } else {
-        await uiService.showInformationMessage("Command saved");
+        await uiService.showInformationMessage("Prompt saved");
       }
     }
   };
@@ -59,15 +59,15 @@ export function createRemoveCommandHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
-  return async (item: MemoItem) => {
+  return async (item: Prompt) => {
     if (!item) return;
 
-    const success = await dataService.removeCommand(item.id);
+    const success = await dataService.removePrompt(item.id);
 
     if (success) {
-      uiService.showInformationMessage("Command deleted");
+      uiService.showInformationMessage("Prompt deleted");
     } else {
-      uiService.showErrorMessage("Failed to delete command");
+      uiService.showErrorMessage("Failed to delete prompt");
     }
   };
 }
@@ -82,20 +82,20 @@ export function createRenameCommandHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
-  return async (item: MemoItem) => {
+  return async (item: Prompt) => {
     if (!item) return;
 
     const alias = await uiService.showInputBox({
-      placeHolder: "Enter new alias for the command",
-      prompt: "This will change how the command appears in the list",
+      placeHolder: "Enter new alias for the prompt",
+      prompt: "This will change how the prompt appears in the list",
       value: item.alias || item.label,
     });
 
     if (alias !== undefined) {
-      const result = await dataService.renameCommand(item.id, alias);
+      const result = await dataService.renamePrompt(item.id, alias);
 
       if (result.success) {
-        uiService.showInformationMessage("Command renamed");
+        uiService.showInformationMessage("Prompt renamed");
       } else if (result.error) {
         uiService.showErrorMessage(result.error);
       }
@@ -111,11 +111,11 @@ export function createRenameCommandHandler(
 export function createPasteToEditorHandler(
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
-  return async (item: MemoItem) => {
+  return async (item: Prompt) => {
     if (!item) return;
 
     await uiService.openCursorChat();
-    await uiService.writeClipboard(item.command);
+    await uiService.writeClipboard(item.content);
     await directPaste();
   };
 }
@@ -130,20 +130,20 @@ export function createEditCommandHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
-  return async (item: MemoItem) => {
+  return async (item: Prompt) => {
     if (!item) return;
 
-    const editedCommand = await uiService.createMultilineInputBox(
-      "Edit Command Content",
-      "Modify command content",
-      item.command
+    const editedPrompt = await uiService.createMultilineInputBox(
+      "Edit Prompt Content",
+      "Modify prompt content",
+      item.content
     );
 
-    if (editedCommand !== undefined && editedCommand !== item.command) {
-      const result = await dataService.editCommand(item.id, editedCommand);
+    if (editedPrompt !== undefined && editedPrompt !== item.content) {
+      const result = await dataService.editPrompt(item.id, editedPrompt);
 
       if (result.success) {
-        uiService.showInformationMessage("Command updated");
+        uiService.showInformationMessage("Prompt updated");
       } else if (result.error) {
         uiService.showErrorMessage(result.error);
       }

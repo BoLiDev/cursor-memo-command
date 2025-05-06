@@ -14,7 +14,7 @@ import {
   CategoryGroupTreeItem,
   CategoryTreeItem,
 } from "./view/tree-provider";
-import { MemoItem } from "./models/memo-item";
+import { Prompt } from "./models/prompt";
 
 import {
   createRemoveCloudCategoryHandler,
@@ -33,7 +33,7 @@ import {
   createRenameCategoryHandler,
   createDeleteCategoryHandler,
   createMoveToCategoryHandler,
-  createAddCommandToCategoryHandler,
+  createAddPromptToCategoryHandler,
 } from "./commands/category-commands";
 import {
   createExportCommandsHandler,
@@ -43,7 +43,7 @@ import { createPushToGitLabHandler } from "./commands/cloud-push-command";
 
 let memoTreeProvider: MemoTreeDataProvider;
 let memoTreeView: vscode.TreeView<
-  CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+  CategoryGroupTreeItem | CategoryTreeItem | Prompt
 >;
 
 /**
@@ -125,7 +125,7 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-    "cursor-memo.addCommandToCategory": createAddCommandToCategoryHandler(
+    "cursor-memo.addCommandToCategory": createAddPromptToCategoryHandler(
       localMemoService,
       uiService
     ),

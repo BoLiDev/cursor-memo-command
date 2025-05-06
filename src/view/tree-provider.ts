@@ -1,7 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { MemoItem } from "../models/memo-item";
+import { Prompt } from "../models/prompt";
 import { LocalService } from "../services/local-service";
 import { CloudService } from "../services/cloud-service";
 import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
@@ -14,31 +14,16 @@ export { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
  */
 export class MemoTreeDataProvider
   implements
-    vscode.TreeDataProvider<CategoryGroupTreeItem | CategoryTreeItem | MemoItem>
+    vscode.TreeDataProvider<CategoryGroupTreeItem | CategoryTreeItem | Prompt>
 {
   private _onDidChangeTreeData: vscode.EventEmitter<
-    | CategoryGroupTreeItem
-    | CategoryTreeItem
-    | MemoItem
-    | undefined
-    | null
-    | void
+    CategoryGroupTreeItem | CategoryTreeItem | Prompt | undefined | null | void
   > = new vscode.EventEmitter<
-    | CategoryGroupTreeItem
-    | CategoryTreeItem
-    | MemoItem
-    | undefined
-    | null
-    | void
+    CategoryGroupTreeItem | CategoryTreeItem | Prompt | undefined | null | void
   >();
 
   readonly onDidChangeTreeData: vscode.Event<
-    | CategoryGroupTreeItem
-    | CategoryTreeItem
-    | MemoItem
-    | undefined
-    | null
-    | void
+    CategoryGroupTreeItem | CategoryTreeItem | Prompt | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
   private commandCallback: string | undefined;
@@ -79,7 +64,7 @@ export class MemoTreeDataProvider
    * @returns Configured TreeItem instance
    */
   getTreeItem(
-    element: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
+    element: CategoryGroupTreeItem | CategoryTreeItem | Prompt
   ): vscode.TreeItem {
     if (
       element instanceof CategoryGroupTreeItem ||
@@ -96,7 +81,7 @@ export class MemoTreeDataProvider
 
     treeItem.description = new Date(element.timestamp).toLocaleString();
     treeItem.iconPath = new vscode.ThemeIcon("note");
-    treeItem.tooltip = element.command;
+    treeItem.tooltip = element.content;
     treeItem.contextValue = element.isCloud ? "cloudMemoItem" : "memoItem";
 
     if (this.commandCallback) {
@@ -117,8 +102,8 @@ export class MemoTreeDataProvider
    * @returns Array of child elements
    */
   getChildren(
-    element?: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
-  ): (CategoryGroupTreeItem | CategoryTreeItem | MemoItem)[] {
+    element?: CategoryGroupTreeItem | CategoryTreeItem | Prompt
+  ): (CategoryGroupTreeItem | CategoryTreeItem | Prompt)[] {
     if (!element) {
       const groups: CategoryGroupTreeItem[] = [];
       groups.push(this.viewModel.getLocalGroupNode());
@@ -148,10 +133,8 @@ export class MemoTreeDataProvider
    * @returns Parent element, or null if there is none
    */
   getParent(
-    element: CategoryGroupTreeItem | CategoryTreeItem | MemoItem
-  ): vscode.ProviderResult<
-    CategoryGroupTreeItem | CategoryTreeItem | MemoItem
-  > {
+    element: CategoryGroupTreeItem | CategoryTreeItem | Prompt
+  ): vscode.ProviderResult<CategoryGroupTreeItem | CategoryTreeItem | Prompt> {
     if (element instanceof CategoryGroupTreeItem) {
       return null;
     }

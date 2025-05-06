@@ -1,7 +1,7 @@
 /** @format */
 
 import { z } from "zod";
-import { CommandsStructureSchema } from "./command-schema";
+import { PromptsStructureSchema } from "./prompt-schema";
 
 export const GitLabFileContentSchema = z.object({
   file_name: z.string(),
@@ -17,7 +17,7 @@ export const GitLabFileContentSchema = z.object({
   execute_filemode: z.boolean().optional(),
 });
 
-export const GitLabDataSchema = CommandsStructureSchema;
+export const GitLabDataSchema = PromptsStructureSchema;
 
 export const GitLabBranchResponseSchema = z.object({
   name: z.string(),

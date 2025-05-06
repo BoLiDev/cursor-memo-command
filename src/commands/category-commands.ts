@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { LocalService } from "../services/local-service";
 import { CategoryTreeItem } from "../view/tree-items";
-import { MemoItem } from "../models/memo-item";
+import { Prompt } from "../models/prompt";
 import { Category } from "../models/category";
 import { VSCodeUserInteractionService } from "../services/vscode-user-interaction-service";
 
@@ -115,7 +115,7 @@ export function createDeleteCategoryHandler(
     }
 
     const confirmationItem = await uiService.showWarningMessage(
-      `Are you sure you want to delete the category "${categoryName}"? Commands inside will be moved to Default.`,
+      `Are you sure you want to delete the category "${categoryName}"? Prompts inside will be moved to Default.`,
       { modal: true },
       { title: "Delete" }
     );
@@ -128,7 +128,7 @@ export function createDeleteCategoryHandler(
 
     if (result.success) {
       await uiService.showInformationMessage(
-        `Category deleted. ${result.commandsMoved} command(s) moved to the default category.`
+        `Category deleted. ${result.promptsMoved} prompt(s) moved to the default category.`
       );
     } else {
       await uiService.showErrorMessage(
@@ -148,7 +148,7 @@ export function createMoveToCategoryHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
-  return async (item: MemoItem) => {
+  return async (item: Prompt) => {
     if (!item) return;
 
     const allCategories = dataService.getCategories();
@@ -178,19 +178,19 @@ export function createMoveToCategoryHandler(
           })
         ),
         {
-          placeHolder: "Select a category to move this command to",
+          placeHolder: "Select a category to move this prompt to",
         }
       );
 
     if (selectedCategoryItem) {
-      const result = await dataService.moveCommandToCategory(
+      const result = await dataService.movePromptToCategory(
         item.id,
         selectedCategoryItem.category.id
       );
 
       if (result.success) {
         await uiService.showInformationMessage(
-          `Command moved to "${selectedCategoryItem.category.name}"`
+          `Prompt moved to "${selectedCategoryItem.category.name}"`
         );
       } else if (result.error) {
         await uiService.showErrorMessage(result.error);
@@ -200,12 +200,12 @@ export function createMoveToCategoryHandler(
 }
 
 /**
- * Creates the add command to category handler
+ * Creates the add prompt to category command handler
  * @param dataService The local memo data service
  * @param uiService The user interaction service
- * @returns The add command to category handler function
+ * @returns The add prompt to category command handler function
  */
-export function createAddCommandToCategoryHandler(
+export function createAddPromptToCategoryHandler(
   dataService: LocalService,
   uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
@@ -221,15 +221,15 @@ export function createAddCommandToCategoryHandler(
       uiService.showErrorMessage("Failed to read clipboard");
     }
 
-    const commandText = await uiService.createMultilineInputBox(
-      `Add Command to "${categoryName}"`,
-      "Enter or paste the command content",
+    const promptText = await uiService.createMultilineInputBox(
+      `Add Prompt to "${categoryName}"`,
+      "Enter or paste the prompt content",
       clipboardText
     );
 
-    if (commandText) {
-      const result = await dataService.addCommand(
-        commandText,
+    if (promptText) {
+      const result = await dataService.addPrompt(
+        promptText,
         categoryItem.category.id
       );
 
@@ -237,7 +237,7 @@ export function createAddCommandToCategoryHandler(
         await uiService.showErrorMessage(result.error);
       } else {
         await uiService.showInformationMessage(
-          `Command added to "${categoryName}"`
+          `Prompt added to "${categoryName}"`
         );
       }
     }
