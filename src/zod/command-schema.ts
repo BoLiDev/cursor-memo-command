@@ -1,8 +1,8 @@
 /** @format */
 
 import { z } from "zod";
-import { MemoItem } from "../models/memo-item"; // Import MemoItem
-import { Category } from "../models/category"; // Import Category
+// import { MemoItem } from "../models/memo-item"; // Removed: No longer needed
+// import { Category } from "../models/category"; // Removed: No longer needed
 
 // 单个命令内容的 schema
 export const CommandContentSchema = z.object({
@@ -57,57 +57,4 @@ export function parseCommands(
     }
     throw error;
   }
-}
-
-// 为了兼容内部模型，需要将命令数据转换为 MemoItem 数组
-export function toMemoItems(
-  commandData: z.infer<typeof CommandsStructureSchema>
-): Omit<MemoItem, "isCloud">[] {
-  const now = Date.now();
-  const items: Omit<MemoItem, "isCloud">[] = [];
-
-  Object.entries(commandData).forEach(([categoryName, commands]) => {
-    Object.entries(commands).forEach(([alias, commandObj]) => {
-      const command = commandObj.content;
-      const label =
-        command.length > 30 ? `${command.slice(0, 30)}...` : command;
-
-      const categoryId = categoryName;
-
-      items.push({
-        id: `cmd_${now}_${Math.random().toString().slice(2)}`,
-        label,
-        command,
-        timestamp: now,
-        alias,
-        categoryId: categoryId,
-      });
-    });
-  });
-
-  return items;
-}
-
-// 从 MemoItem 数组转换为命令数据结构
-export function fromMemoItems(
-  items: MemoItem[],
-  categories?: Category[]
-): z.infer<typeof CommandsStructureSchema> {
-  const result: z.infer<typeof CommandsStructureSchema> = {};
-  const categoryMap = new Map(categories?.map((cat) => [cat.id, cat.name]));
-
-  items.forEach((item) => {
-    const categoryName = categoryMap?.get(item.categoryId) ?? item.categoryId;
-    const alias = item.alias || item.label || "未命名命令";
-
-    if (!result[categoryName]) {
-      result[categoryName] = {};
-    }
-
-    result[categoryName][alias] = {
-      content: item.command,
-    };
-  });
-
-  return result;
 }

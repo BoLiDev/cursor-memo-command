@@ -1,8 +1,24 @@
 /** @format */
 
 import { z } from "zod";
+import { CommandsStructureSchema } from "./command-schema"; // Assuming command-schema.ts will be the final name
 
-// GitLab 分支创建响应验证模式
+export const GitLabFileContentSchema = z.object({
+  file_name: z.string(),
+  file_path: z.string(),
+  size: z.number(),
+  encoding: z.string(),
+  content: z.string(),
+  content_sha256: z.string(),
+  ref: z.string(),
+  blob_id: z.string(),
+  commit_id: z.string(),
+  last_commit_id: z.string(),
+  execute_filemode: z.boolean().optional(),
+});
+
+export const GitLabDataSchema = CommandsStructureSchema;
+
 export const GitLabBranchResponseSchema = z.object({
   name: z.string(),
   commit: z.object({
@@ -21,7 +37,6 @@ export const GitLabBranchResponseSchema = z.object({
   web_url: z.string(),
 });
 
-// GitLab 合并请求响应验证模式
 export const GitLabMergeRequestResponseSchema = z.object({
   id: z.number(),
   iid: z.number(),
@@ -37,13 +52,13 @@ export const GitLabMergeRequestResponseSchema = z.object({
   merge_status: z.string(),
 });
 
-// GitLab 文件提交响应验证模式
 export const GitLabFileCommitResponseSchema = z.object({
   file_path: z.string(),
   branch: z.string(),
 });
 
-// 类型导出
+export type GitLabContent = z.infer<typeof GitLabFileContentSchema>;
+export type GitLabData = z.infer<typeof GitLabDataSchema>;
 export type GitLabBranchResponse = z.infer<typeof GitLabBranchResponseSchema>;
 export type GitLabMergeRequestResponse = z.infer<
   typeof GitLabMergeRequestResponseSchema

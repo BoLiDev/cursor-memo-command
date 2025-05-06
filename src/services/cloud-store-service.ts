@@ -4,14 +4,14 @@ import * as vscode from "vscode";
 import * as os from "os";
 import { MemoItem } from "../models/memo-item";
 import {
-  fromMemoItems,
   parseCommands,
   serializeCommands,
-  toMemoItems,
+  CommandsStructureSchema,
 } from "../zod/command-schema";
 import { StorageService } from "./storage-service";
 import { ConfigurationService } from "./configuration-service";
 import { GitlabApiService, GitlabApiError } from "./gitlab-api-service";
+import { z } from "zod";
 
 // Result type for operations that might require user interaction (like missing token)
 export type CloudOperationResult<T> =
@@ -63,6 +63,40 @@ export class CloudStoreService {
   }
 
   /**
+   * Parses the command data string and transforms it into MemoItems.
+   * @param decodedContent The raw string content from GitLab.
+   * @returns An object containing the parsed commands structure and the transformed MemoItems array.
+   * @throws If parsing or validation fails.
+   */
+  private _parseAndTransformCommands(decodedContent: string): {
+    commandsData: z.infer<typeof CommandsStructureSchema>;
+    commands: Omit<MemoItem, "isCloud">[];
+  } {
+    const commandsData = parseCommands(decodedContent);
+    const now = Date.now();
+    const items: Omit<MemoItem, "isCloud">[] = [];
+
+    Object.entries(commandsData).forEach(([categoryName, commands]) => {
+      Object.entries(commands).forEach(([alias, commandObj]) => {
+        const command = commandObj.content;
+        const label =
+          command.length > 30 ? `${command.slice(0, 30)}...` : command;
+        const categoryId = categoryName;
+
+        items.push({
+          id: `cmd_${now}_${Math.random().toString().slice(2)}`,
+          label,
+          command,
+          timestamp: now,
+          alias,
+          categoryId: categoryId,
+        });
+      });
+    });
+    return { commandsData, commands: items };
+  }
+
+  /**
    * Fetches, decodes, parses, and validates team commands from GitLab.
    * Does not update internal state.
    */
@@ -87,8 +121,8 @@ export class CloudStoreService {
       );
 
       try {
-        const commandsData = parseCommands(decodedContent);
-        const commands = toMemoItems(commandsData);
+        const { commandsData, commands } =
+          this._parseAndTransformCommands(decodedContent);
         const categories = Object.keys(commandsData);
         return {
           success: true,
@@ -222,7 +256,7 @@ export class CloudStoreService {
    * Pushes specified commands to GitLab by creating a merge request.
    * Merges provided commands with the current remote state before pushing.
    * @param commandsToPush Array of MemoItems to add/update in GitLab.
-   * @param involvedCategories List of categories involved (for commit/MR message).
+   * @param involvedCategories List of category IDs/names involved (for commit/MR message).
    */
   public async pushCommandsToGitLab(
     commandsToPush: MemoItem[],
@@ -259,7 +293,7 @@ export class CloudStoreService {
         alias: cmd.alias || cmd.label,
       }));
       const uniqueCommands = removeDuplicateCommands(processedCommands);
-      const commandsData = fromMemoItems(uniqueCommands);
+      const commandsData = this._transformMemoItemsToStructure(uniqueCommands);
       const newFileContent = serializeCommands(commandsData);
       const newFileContentBase64 =
         Buffer.from(newFileContent).toString("base64");
@@ -362,6 +396,38 @@ export class CloudStoreService {
       []
     );
     this.cloudCommands = stored.map((cmd) => ({ ...cmd, isCloud: true }));
+  }
+
+  /**
+   * Transforms an array of MemoItems into the nested structure expected by GitLab/export format.
+   * @param items The MemoItem array.
+   * @returns The nested command structure.
+   */
+  private _transformMemoItemsToStructure(
+    items: MemoItem[]
+  ): z.infer<typeof CommandsStructureSchema> {
+    const result: z.infer<typeof CommandsStructureSchema> = {};
+
+    items.forEach((item) => {
+      const categoryName = item.categoryId;
+      const alias = item.alias || item.label || "Unnamed Command";
+
+      if (!result[categoryName]) {
+        result[categoryName] = {};
+      }
+
+      if (!result[categoryName][alias]) {
+        result[categoryName][alias] = {
+          content: item.command,
+        };
+      } else {
+        console.warn(
+          `Alias collision detected in category '${categoryName}' for alias '${alias}'. Keeping first encountered item during transformation.`
+        );
+      }
+    });
+
+    return result;
   }
 }
 

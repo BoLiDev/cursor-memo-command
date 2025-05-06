@@ -1,14 +1,13 @@
 /** @format */
 
-import * as vscode from "vscode"; // Keep vscode for potential future UI interactions, or remove if strictly API
 import fetch, { Response } from "node-fetch";
 import { z } from "zod";
-import { GitLabFileContentSchema } from "../zod/gitlab";
 import {
+  GitLabFileContentSchema,
   GitLabBranchResponseSchema,
   GitLabMergeRequestResponseSchema,
   GitLabFileCommitResponseSchema,
-} from "../zod/gitlab-mr";
+} from "../zod";
 import { StorageService } from "./storage-service";
 import { ConfigurationService } from "./configuration-service";
 
