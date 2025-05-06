@@ -9,12 +9,10 @@ import { createMultilineInputBox, directPaste } from "../utils";
 /**
  * Creates the save command handler
  * @param dataService The local memo data service
- * @param memoTreeProvider The memo tree data provider
  * @returns The save command handler function
  */
 export function createSaveCommandHandler(
-  dataService: LocalMemoService,
-  memoTreeProvider: MemoTreeDataProvider
+  dataService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async () => {
     let clipboardText = "";
@@ -32,7 +30,6 @@ export function createSaveCommandHandler(
 
     if (commandText) {
       await dataService.addCommand(commandText);
-      memoTreeProvider.updateView();
       vscode.window.showInformationMessage("Command saved");
     }
   };
@@ -41,12 +38,10 @@ export function createSaveCommandHandler(
 /**
  * Creates the remove command handler
  * @param dataService The local memo data service
- * @param memoTreeProvider The memo tree data provider
  * @returns The remove command handler function
  */
 export function createRemoveCommandHandler(
-  dataService: LocalMemoService,
-  memoTreeProvider: MemoTreeDataProvider
+  dataService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
     if (!item) return;
@@ -55,7 +50,6 @@ export function createRemoveCommandHandler(
     const success = await dataService.removeCommand(item.id);
 
     if (success) {
-      memoTreeProvider.updateView();
       vscode.window.showInformationMessage("Command deleted");
     }
   };
@@ -64,12 +58,10 @@ export function createRemoveCommandHandler(
 /**
  * Creates the rename command handler
  * @param dataService The local memo data service
- * @param memoTreeProvider The memo tree data provider
  * @returns The rename command handler function
  */
 export function createRenameCommandHandler(
-  dataService: LocalMemoService,
-  memoTreeProvider: MemoTreeDataProvider
+  dataService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
     if (!item) return;
@@ -84,7 +76,6 @@ export function createRenameCommandHandler(
       const success = await dataService.renameCommand(item.id, alias);
 
       if (success) {
-        memoTreeProvider.updateView();
         vscode.window.showInformationMessage("Command renamed");
       }
     }
@@ -109,12 +100,10 @@ export function createPasteToEditorHandler(): (
 /**
  * Creates the edit command handler
  * @param dataService The local memo data service
- * @param memoTreeProvider The memo tree data provider
  * @returns The edit command handler function
  */
 export function createEditCommandHandler(
-  dataService: LocalMemoService,
-  memoTreeProvider: MemoTreeDataProvider
+  dataService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
     if (!item) return;
@@ -129,7 +118,6 @@ export function createEditCommandHandler(
       const success = await dataService.editCommand(item.id, editedCommand);
 
       if (success) {
-        memoTreeProvider.updateView();
         vscode.window.showInformationMessage("Command updated");
       }
     }

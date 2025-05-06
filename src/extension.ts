@@ -81,70 +81,40 @@ export async function activate(context: vscode.ExtensionContext) {
     localMemoService,
     cloudStoreService
   );
-
-  // Register Tree View
+  // Register Tree View and push TreeDataProvider to subscriptions for disposal
   memoTreeView = vscode.window.createTreeView("cursorMemoPanel", {
     treeDataProvider: memoTreeProvider,
     showCollapseAll: true,
   });
   context.subscriptions.push(memoTreeView);
+  context.subscriptions.push(memoTreeProvider); // Ensure provider is disposed
 
   // Set the command to be executed when a memo item is clicked (no change needed)
   memoTreeProvider.setCommandCallback("cursor-memo.pasteToEditor");
 
   // --- Register Commands ---
-  // Pass the correct service instances to command handlers
+  // Pass only the necessary service instances to command handlers
   const commands: { [key: string]: (...args: any[]) => Promise<void> } = {
     // Local Commands (use localMemoService)
-    "cursor-memo.saveCommand": createSaveCommandHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
-    "cursor-memo.removeCommand": createRemoveCommandHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
-    "cursor-memo.renameCommand": createRenameCommandHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
+    "cursor-memo.saveCommand": createSaveCommandHandler(localMemoService),
+    "cursor-memo.removeCommand": createRemoveCommandHandler(localMemoService),
+    "cursor-memo.renameCommand": createRenameCommandHandler(localMemoService),
     "cursor-memo.pasteToEditor": createPasteToEditorHandler(), // No service needed
-    "cursor-memo.editCommand": createEditCommandHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
+    "cursor-memo.editCommand": createEditCommandHandler(localMemoService),
 
     // Category Commands (use localMemoService for local categories)
-    "cursor-memo.addCategory": createAddCategoryHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
-    "cursor-memo.renameCategory": createRenameCategoryHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
-    "cursor-memo.deleteCategory": createDeleteCategoryHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
-    "cursor-memo.moveToCategory": createMoveToCategoryHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
-    "cursor-memo.addCommandToCategory": createAddCommandToCategoryHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
+    "cursor-memo.addCategory": createAddCategoryHandler(localMemoService),
+    "cursor-memo.renameCategory": createRenameCategoryHandler(localMemoService),
+    "cursor-memo.deleteCategory": createDeleteCategoryHandler(localMemoService),
+    "cursor-memo.moveToCategory": createMoveToCategoryHandler(localMemoService),
+    "cursor-memo.addCommandToCategory":
+      createAddCommandToCategoryHandler(localMemoService),
 
     // Cloud/GitLab Commands (use cloudStoreService)
-    "cursor-memo.removeCloudCategory": createRemoveCloudCategoryHandler(
-      cloudStoreService,
-      memoTreeProvider
-    ),
-    "cursor-memo.syncFromGitLab": createSyncFromGitLabHandler(
-      cloudStoreService,
-      memoTreeProvider
-    ),
+    "cursor-memo.removeCloudCategory":
+      createRemoveCloudCategoryHandler(cloudStoreService),
+    "cursor-memo.syncFromGitLab":
+      createSyncFromGitLabHandler(cloudStoreService),
     "cursor-memo.manageGitLabToken":
       createManageGitLabTokenHandler(cloudStoreService),
     "cursor-memo.pushToGitLab": createPushToGitLabHandler(
@@ -154,15 +124,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Data Transfer Commands (use localMemoService for local data export/import)
     "cursor-memo.exportCommands": createExportCommandsHandler(localMemoService),
-    "cursor-memo.importCommands": createImportCommandsHandler(
-      localMemoService,
-      memoTreeProvider
-    ),
+    "cursor-memo.importCommands": createImportCommandsHandler(localMemoService),
 
-    // Refresh command
+    // Refresh command - now likely obsolete or could trigger service reloads
     "cursor-memo.refresh": async () => {
-      // ViewModel update now handles both local and cloud refresh
-      memoTreeProvider.updateView();
+      // View updates automatically via events. Manual refresh logic might be needed
+      // if there are cases where events might not cover everything (e.g., config change affecting view)
+      console.log(
+        "Refresh triggered. View should update automatically via events."
+      );
+      // Optionally, force service re-initialization or data fetching:
+      // await localMemoService.initialize(); // Example: Force reload local data
+      // await cloudStoreService.initialize(); // Example: Force reload cloud data
     },
   };
 
@@ -173,8 +146,9 @@ export async function activate(context: vscode.ExtensionContext) {
     );
   }
 
-  // Initial refresh to load data into the view
-  memoTreeProvider.updateView();
+  // Initial view is populated automatically by the provider's constructor listening to view model events.
+  // The explicit refresh call here is no longer needed.
+  // memoTreeProvider.updateView(); // REMOVED
 }
 
 /**
@@ -182,4 +156,6 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 export function deactivate() {
   console.log('"cursor-memo" is now deactivated!');
+  // Note: TreeDataProvider and ViewModel disposals should be handled by VS Code
+  // when the extension context subscriptions are disposed, including the memoTreeProvider pushed earlier.
 }

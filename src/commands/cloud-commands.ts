@@ -12,12 +12,10 @@ import { CategoryTreeItem } from "../view/tree-items";
  * Creates the remove cloud category handler.
  * Allows removing a cloud category locally without affecting remote data.
  * @param cloudStoreService The service managing cloud command state
- * @param memoTreeProvider The memo tree data provider
  * @returns The remove cloud category handler function
  */
 export function createRemoveCloudCategoryHandler(
-  cloudStoreService: CloudStoreService,
-  memoTreeProvider: MemoTreeDataProvider
+  cloudStoreService: CloudStoreService
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {
     if (!categoryItem) return;
@@ -27,7 +25,6 @@ export function createRemoveCloudCategoryHandler(
     const result = await cloudStoreService.removeCloudCategory(categoryId);
 
     if (result.success) {
-      memoTreeProvider.updateView();
       vscode.window.showInformationMessage(
         `Removed cloud category "${categoryItem.category.name}" from local storage. ${result.removedCommands} command(s) removed.`
       );
@@ -42,12 +39,10 @@ export function createRemoveCloudCategoryHandler(
 /**
  * Creates the sync from GitLab command handler
  * @param cloudStoreService The service managing cloud command state
- * @param memoTreeProvider The memo tree data provider
  * @returns The sync from GitLab command handler function
  */
 export function createSyncFromGitLabHandler(
-  cloudStoreService: CloudStoreService,
-  memoTreeProvider: MemoTreeDataProvider
+  cloudStoreService: CloudStoreService
 ): (...args: any[]) => Promise<void> {
   return async () => {
     vscode.window.withProgress(
@@ -106,7 +101,6 @@ export function createSyncFromGitLabHandler(
           await cloudStoreService.syncSelectedFromGitLab(selectedOption);
 
         if (syncResult.success) {
-          memoTreeProvider.updateView();
           vscode.window.showInformationMessage(
             `Synced ${syncResult.data.syncedCommands} command(s) from selected GitLab categories.`
           );

@@ -22,6 +22,13 @@ export class MemoTreeViewModel {
   private localGroupNode: CategoryGroupTreeItem;
   private cloudGroupNode: CategoryGroupTreeItem;
 
+  // --- Event Emitter for ViewModel Updates ---
+  private _onDidViewModelUpdate = new vscode.EventEmitter<void>();
+  readonly onDidViewModelUpdate: vscode.Event<void> =
+    this._onDidViewModelUpdate.event;
+
+  private disposables: vscode.Disposable[] = [];
+
   /**
    * Constructor
    * @param localDataService Service for local data
@@ -42,6 +49,23 @@ export class MemoTreeViewModel {
       vscode.TreeItemCollapsibleState.Expanded,
       true // isCloud = true
     );
+
+    // --- Subscribe to Service Events ---
+    this.disposables.push(
+      this.localDataService.onDidCommandsChange(() => {
+        console.log("ViewModel: Received local commands change event.");
+        this.update();
+      }),
+      this.localDataService.onDidCategoriesChange(() => {
+        console.log("ViewModel: Received local categories change event.");
+        this.update();
+      }),
+      this.cloudStoreService.onDidCloudCommandsChange(() => {
+        console.log("ViewModel: Received cloud commands change event.");
+        this.update();
+      })
+    );
+
     this.update(); // Initial data load
   }
 
@@ -49,6 +73,7 @@ export class MemoTreeViewModel {
    * Update the view model state from the data services
    */
   public update(): void {
+    console.log("ViewModel: Updating data...");
     // Fetch latest data
     this.localCommands = this.localDataService.getCommands();
     this.cloudCommands = this.cloudStoreService.getCloudCommands();
@@ -64,6 +89,17 @@ export class MemoTreeViewModel {
 
     // Rebuild category nodes
     this.rebuildCategoryNodes();
+    console.log("ViewModel: Data updated, firing event.");
+    // --- Fire ViewModel Update Event ---
+    this._onDidViewModelUpdate.fire();
+  }
+
+  /**
+   * Dispose of event listeners when the view model is no longer needed.
+   */
+  public dispose(): void {
+    this.disposables.forEach((d) => d.dispose());
+    this._onDidViewModelUpdate.dispose();
   }
 
   /**
@@ -102,6 +138,7 @@ export class MemoTreeViewModel {
     this.cloudCategoriesSet.forEach((catId) => {
       const items = this.getCloudCategoryItems(catId);
 
+      // Avoid duplicating the "Default" category node if it exists locally and has no cloud items
       if (
         catId === this.localDataService.getDefaultCategoryId() &&
         this.localCategoryNodes.has(catId) &&
@@ -113,29 +150,36 @@ export class MemoTreeViewModel {
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
           : vscode.TreeItemCollapsibleState.None;
+      // Use the name from local categories if available, otherwise use the ID as name
+      const categoryName =
+        this.localCategories.find((cat) => cat.id === catId)?.name ?? catId;
       this.cloudCategoryNodes.set(
         catId,
-        new CategoryTreeItem({ id: catId, name: catId }, collapsibleState, true)
+        new CategoryTreeItem(
+          { id: catId, name: categoryName },
+          collapsibleState,
+          true
+        )
       );
     });
 
     // --- Update Group Node States ---
     const localCollapsibleState = this.hasLocalData()
       ? vscode.TreeItemCollapsibleState.Expanded
-      : vscode.TreeItemCollapsibleState.None;
+      : vscode.TreeItemCollapsibleState.None; // Keep expanded if it has data, otherwise no expansion needed
     this.localGroupNode = new CategoryGroupTreeItem(
       this.localGroupNode.label!, // Reuse label
-      localCollapsibleState, // Set state during creation
+      localCollapsibleState,
       false
     );
 
     const cloudCollapsibleState =
-      this.cloudCommands.length > 0 || this.cloudCategoriesSet.size > 0
+      this.cloudCommands.length > 0 || this.cloudCategoryNodes.size > 0 // Use the updated cloudCategoryNodes map size
         ? vscode.TreeItemCollapsibleState.Expanded
         : vscode.TreeItemCollapsibleState.Collapsed; // Keep collapsed if empty
     this.cloudGroupNode = new CategoryGroupTreeItem(
       this.cloudGroupNode.label!, // Reuse label
-      cloudCollapsibleState, // Set state during creation
+      cloudCollapsibleState,
       true
     );
   }
@@ -158,14 +202,18 @@ export class MemoTreeViewModel {
 
   public getSortedCloudCategories(): CategoryTreeItem[] {
     const cloudCats = Array.from(this.cloudCategoryNodes.values())
+      // Filter logic refined: only show cloud 'Default' if it has items or doesn't exist locally
       .filter((node) => {
-        if (
-          node.category.id === this.localDataService.getDefaultCategoryId() &&
-          this.localCategoryNodes.has(node.category.id)
-        ) {
-          return this.getCloudCategoryItems(node.category.id).length > 0;
+        const isDefault =
+          node.category.id === this.localDataService.getDefaultCategoryId();
+        const existsLocally = this.localCategoryNodes.has(node.category.id);
+        const hasCloudItems =
+          this.getCloudCategoryItems(node.category.id).length > 0;
+
+        if (isDefault && existsLocally) {
+          return hasCloudItems; // Only show cloud 'Default' if it has items when it also exists locally
         }
-        return true;
+        return true; // Show other cloud categories
       })
       .sort((a, b) => a.category.name.localeCompare(b.category.name));
     return cloudCats;

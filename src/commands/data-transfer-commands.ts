@@ -75,12 +75,10 @@ export function createExportCommandsHandler(
 /**
  * Creates the import commands handler
  * @param dataService The local memo data service
- * @param memoTreeProvider The memo tree data provider
  * @returns The import commands handler function
  */
 export function createImportCommandsHandler(
-  dataService: LocalMemoService,
-  memoTreeProvider: MemoTreeDataProvider
+  dataService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async () => {
     const dataTransferService = new DataTransferService(dataService);
@@ -131,8 +129,7 @@ export function createImportCommandsHandler(
           await importSelectedData(
             fileContents, // 仍然传递原始 JSON 字符串
             selectedOption,
-            dataTransferService,
-            memoTreeProvider
+            dataTransferService
           );
         } catch (parseError) {
           vscode.window.showErrorMessage(
@@ -152,8 +149,7 @@ export function createImportCommandsHandler(
 async function importSelectedData(
   jsonData: string,
   selectedCategories: string[],
-  dataTransferService: DataTransferService,
-  memoTreeProvider: MemoTreeDataProvider
+  dataTransferService: DataTransferService
 ): Promise<void> {
   const result = await dataTransferService.importSelectedData(
     jsonData,
@@ -161,7 +157,6 @@ async function importSelectedData(
   );
 
   if (result.success) {
-    memoTreeProvider.updateView();
     vscode.window.showInformationMessage(
       `Imported ${result.importedCommands} commands and ${result.importedCategories} categories`
     );

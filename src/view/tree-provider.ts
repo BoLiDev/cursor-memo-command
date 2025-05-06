@@ -44,6 +44,7 @@ export class MemoTreeDataProvider
 
   private commandCallback: string | undefined;
   private viewModel: MemoTreeViewModel;
+  private viewModelListener: vscode.Disposable | undefined;
 
   /**
    * Constructor
@@ -58,16 +59,16 @@ export class MemoTreeDataProvider
       this.localDataService,
       this.cloudStoreService
     );
-    this.updateView();
-  }
 
-  /**
-   * Update view data, refresh the display of categories and commands
-   * Call this method when data changes
-   */
-  public updateView(): void {
-    this.viewModel.update();
-    this._onDidChangeTreeData.fire();
+    // Listen to ViewModel updates to refresh the tree
+    this.viewModelListener = this.viewModel.onDidViewModelUpdate(() => {
+      console.log(
+        "TreeProvider: Received view model update, firing tree data change."
+      );
+      this._onDidChangeTreeData.fire();
+    });
+
+    // Initial data is loaded by the ViewModel constructor and the event fires automatically
   }
 
   /**
@@ -181,5 +182,14 @@ export class MemoTreeDataProvider
 
     // MemoItem's parent is its category node (local or cloud)
     return this.viewModel.getCategoryNodeForItem(element);
+  }
+
+  /**
+   * Dispose resources when the provider is no longer needed.
+   */
+  public dispose(): void {
+    this.viewModelListener?.dispose();
+    this.viewModel.dispose(); // Dispose the view model as well
+    this._onDidChangeTreeData.dispose();
   }
 }
