@@ -36,11 +36,7 @@ export class GitlabClient {
   constructor(
     private storageService: StorageService,
     private configService: ConfigurationService
-  ) {
-    // Configuration is now handled by ConfigurationService
-    // Listen for config changes if needed to re-initialize or update internal state
-    // configService.onDidChangeConfiguration(() => { ... });
-  }
+  ) {}
 
   /**
    * Initialize the GitLab client: load cloud commands and ensure config is present.

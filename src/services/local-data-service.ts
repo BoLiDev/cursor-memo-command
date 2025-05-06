@@ -1,6 +1,5 @@
 /** @format */
 
-import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
 import { StorageService } from "./storage-service";
 
