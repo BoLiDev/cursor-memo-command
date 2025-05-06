@@ -114,6 +114,7 @@ export function createPasteToEditorHandler(
   return async (item: MemoItem) => {
     if (!item) return;
 
+    await uiService.openCursorChat();
     await uiService.writeClipboard(item.command);
     await directPaste();
   };
