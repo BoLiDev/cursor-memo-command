@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import fetch, { Response } from "node-fetch";
 import * as os from "os";
 import { z } from "zod";
-import { GitLabFileContentSchema, GitLabDataSchema } from "../zod/gitlab";
+import { GitLabFileContentSchema } from "../zod/gitlab";
 import {
   GitLabBranchResponseSchema,
   GitLabMergeRequestResponseSchema,
@@ -18,6 +18,8 @@ import {
   serializeCommands,
   toMemoItems,
 } from "../zod/command-schema";
+import { StorageService } from "./storage-service";
+import { ConfigurationService } from "./configuration-service";
 
 /**
  * Service for interacting with GitLab API, including fetching and managing cloud commands.
@@ -27,23 +29,17 @@ export class GitlabClient {
   private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "Default";
-  // 是否使用新的人类友好格式存储到GitLab
-  private static USE_NEW_FORMAT = true;
-
-  private domain: string;
-  private projectId: string;
-  private filePath: string;
-  private branch: string;
 
   private cloudCommands: MemoItem[] = [];
   private initialized: boolean = false;
 
-  constructor(private context: vscode.ExtensionContext) {
-    const config = vscode.workspace.getConfiguration("cursorMemo");
-    this.domain = normalizeGitLabDomain(config.get<string>("gitlabDomain"));
-    this.projectId = config.get<string>("gitlabProjectId") || "9993";
-    this.filePath = config.get<string>("gitlabFilePath") || "prompt.json";
-    this.branch = config.get<string>("gitlabBranch") || "master";
+  constructor(
+    private storageService: StorageService,
+    private configService: ConfigurationService
+  ) {
+    // Configuration is now handled by ConfigurationService
+    // Listen for config changes if needed to re-initialize or update internal state
+    // configService.onDidChangeConfiguration(() => { ... });
   }
 
   /**
@@ -53,7 +49,10 @@ export class GitlabClient {
     if (this.initialized) {
       return;
     }
-    if (!this.projectId || !this.filePath) {
+    if (
+      !this.configService.getGitlabProjectId() ||
+      !this.configService.getGitlabFilePath()
+    ) {
       console.error("GitLab Project ID or File Path is not configured.");
     }
     await this.loadCloudCommands();
@@ -71,14 +70,14 @@ export class GitlabClient {
    * Set GitLab Personal Access Token (used by manage token command).
    */
   public async setToken(token: string): Promise<void> {
-    await this.context.secrets.store(GitlabClient.GITLAB_TOKEN_KEY, token);
+    await this.storageService.setSecret(GitlabClient.GITLAB_TOKEN_KEY, token);
   }
 
   /**
    * Clear stored GitLab Personal Access Token.
    */
   public async clearToken(): Promise<void> {
-    await this.context.secrets.delete(GitlabClient.GITLAB_TOKEN_KEY);
+    await this.storageService.deleteSecret(GitlabClient.GITLAB_TOKEN_KEY);
   }
 
   /**
@@ -86,7 +85,9 @@ export class GitlabClient {
    * If token doesn't exist, interactively ask the user to input it.
    */
   public async getToken(): Promise<string | undefined> {
-    let token = await this.context.secrets.get(GitlabClient.GITLAB_TOKEN_KEY);
+    let token = await this.storageService.getSecret(
+      GitlabClient.GITLAB_TOKEN_KEY
+    );
 
     if (!token) {
       const inputToken = await vscode.window.showInputBox({
@@ -98,7 +99,7 @@ export class GitlabClient {
       });
 
       if (inputToken) {
-        await this.context.secrets.store(
+        await this.storageService.setSecret(
           GitlabClient.GITLAB_TOKEN_KEY,
           inputToken
         );
@@ -120,14 +121,19 @@ export class GitlabClient {
   private async getFileContent(
     token: string
   ): Promise<z.infer<typeof GitLabFileContentSchema>> {
-    if (!this.projectId || !this.filePath) {
+    const projectId = this.configService.getGitlabProjectId();
+    const filePath = this.configService.getGitlabFilePath();
+    const branch = this.configService.getGitlabBranch();
+    const domain = this.configService.getGitlabDomain();
+
+    if (!projectId || !filePath) {
       throw new Error("GitLab Project ID or File Path not configured.");
     }
-    const encodedProjectId = encodeURIComponent(this.projectId);
-    const encodedFilePath = encodeURIComponent(this.filePath);
-    const encodedRef = encodeURIComponent(this.branch);
+    const encodedProjectId = encodeURIComponent(projectId);
+    const encodedFilePath = encodeURIComponent(filePath);
+    const encodedRef = encodeURIComponent(branch);
 
-    const url = `${this.domain}/projects/${encodedProjectId}/repository/files/${encodedFilePath}?ref=${encodedRef}`;
+    const url = `${domain}/projects/${encodedProjectId}/repository/files/${encodedFilePath}?ref=${encodedRef}`;
 
     try {
       const response = await fetch(url, {
@@ -346,7 +352,7 @@ export class GitlabClient {
    * Save cloud commands to global state.
    */
   private async saveCloudCommands(): Promise<void> {
-    await this.context.globalState.update(
+    await this.storageService.setValue(
       GitlabClient.CLOUD_COMMANDS_KEY,
       this.cloudCommands
     );
@@ -356,7 +362,7 @@ export class GitlabClient {
    * Load cloud commands from global state.
    */
   private async loadCloudCommands(): Promise<void> {
-    this.cloudCommands = this.context.globalState.get<MemoItem[]>(
+    this.cloudCommands = this.storageService.getValue<MemoItem[]>(
       GitlabClient.CLOUD_COMMANDS_KEY,
       []
     );
@@ -376,17 +382,21 @@ export class GitlabClient {
   private async createBranch(
     token: string,
     branchName: string,
-    refBranch: string = this.branch
+    refBranch?: string
   ): Promise<{
     success: boolean;
     error?: string;
   }> {
-    if (!this.projectId) {
+    const projectId = this.configService.getGitlabProjectId();
+    const domain = this.configService.getGitlabDomain();
+    const defaultBranch = this.configService.getGitlabBranch();
+
+    if (!projectId) {
       return { success: false, error: "GitLab Project ID not configured." };
     }
 
-    const encodedProjectId = encodeURIComponent(this.projectId);
-    const url = `${this.domain}/projects/${encodedProjectId}/repository/branches`;
+    const encodedProjectId = encodeURIComponent(projectId);
+    const url = `${domain}/projects/${encodedProjectId}/repository/branches`;
 
     try {
       const response = await fetch(url, {
@@ -398,7 +408,7 @@ export class GitlabClient {
         },
         body: JSON.stringify({
           branch: branchName,
-          ref: refBranch,
+          ref: refBranch || defaultBranch,
         }),
       });
 
@@ -449,13 +459,16 @@ export class GitlabClient {
     success: boolean;
     error?: string;
   }> {
-    if (!this.projectId) {
+    const projectId = this.configService.getGitlabProjectId();
+    const domain = this.configService.getGitlabDomain();
+
+    if (!projectId) {
       return { success: false, error: "GitLab Project ID not configured." };
     }
 
-    const encodedProjectId = encodeURIComponent(this.projectId);
+    const encodedProjectId = encodeURIComponent(projectId);
     const encodedFilePath = encodeURIComponent(filePath);
-    const url = `${this.domain}/projects/${encodedProjectId}/repository/files/${encodedFilePath}`;
+    const url = `${domain}/projects/${encodedProjectId}/repository/files/${encodedFilePath}`;
 
     try {
       // 检查文件是否存在
@@ -545,12 +558,15 @@ export class GitlabClient {
     mergeRequestUrl?: string;
     error?: string;
   }> {
-    if (!this.projectId) {
+    const projectId = this.configService.getGitlabProjectId();
+    const domain = this.configService.getGitlabDomain();
+
+    if (!projectId) {
       return { success: false, error: "GitLab Project ID not configured." };
     }
 
-    const encodedProjectId = encodeURIComponent(this.projectId);
-    const url = `${this.domain}/projects/${encodedProjectId}/merge_requests`;
+    const encodedProjectId = encodeURIComponent(projectId);
+    const url = `${domain}/projects/${encodedProjectId}/merge_requests`;
 
     try {
       const response = await fetch(url, {
@@ -681,7 +697,7 @@ export class GitlabClient {
       const commitResult = await this.commitFileChange(
         token,
         branchName,
-        this.filePath,
+        this.configService.getGitlabFilePath() || "",
         newFileContent,
         `Update prompt commands: added ${newCommandsCount} new commands, updated ${commands.length - newCommandsCount} commands.`
       );
@@ -698,7 +714,7 @@ export class GitlabClient {
       const mrResult = await this.createMergeRequest(
         token,
         branchName,
-        this.branch,
+        this.configService.getGitlabBranch() || "",
         `Update prompt commands from ${os.hostname() || "local"}`,
         `This merge request adds ${newCommandsCount} new commands and updates ${commands.length - newCommandsCount} existing commands from categories: ${categories.join(", ")}.`
       );
@@ -758,27 +774,6 @@ export class GitlabClient {
 }
 
 // --- Helper Functions ---
-
-/**
- * Normalize GitLab API URL
- */
-function normalizeGitLabDomain(url?: string): string {
-  if (!url) {
-    console.warn("GitLab domain not configured, defaulting to gitlab.com");
-    return "https://gitlab.com/api/v4";
-  }
-
-  let normalizedUrl = url.trim();
-  if (normalizedUrl.endsWith("/")) {
-    normalizedUrl = normalizedUrl.slice(0, -1);
-  }
-
-  if (!normalizedUrl.endsWith("/api/v4")) {
-    normalizedUrl = `${normalizedUrl}/api/v4`;
-  }
-
-  return normalizedUrl;
-}
 
 /**
  * Handle GitLab API errors

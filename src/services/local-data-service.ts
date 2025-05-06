@@ -2,6 +2,7 @@
 
 import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
+import { StorageService } from "./storage-service";
 
 /**
  * Service for managing local memo items and categories.
@@ -17,9 +18,9 @@ export class LocalMemoService {
 
   /**
    * Constructor
-   * @param context VSCode extension context for accessing global state storage
+   * @param storageService Instance of StorageService for accessing stored data
    */
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private storageService: StorageService) {}
 
   /**
    * Initialize the local data service
@@ -32,7 +33,7 @@ export class LocalMemoService {
       return;
     }
 
-    const storedCommands = this.context.globalState.get<MemoItem[]>(
+    const storedCommands = this.storageService.getValue<MemoItem[]>(
       LocalMemoService.STORAGE_KEY,
       []
     );
@@ -48,7 +49,7 @@ export class LocalMemoService {
       await this.saveCommands();
     }
 
-    this.categories = this.context.globalState.get<string[]>(
+    this.categories = this.storageService.getValue<string[]>(
       LocalMemoService.CATEGORIES_KEY,
       []
     );
@@ -354,7 +355,7 @@ export class LocalMemoService {
    * @returns Promise that resolves when commands have been saved
    */
   private async saveCommands(): Promise<void> {
-    await this.context.globalState.update(
+    await this.storageService.setValue(
       LocalMemoService.STORAGE_KEY,
       this.commands
     );
@@ -365,7 +366,7 @@ export class LocalMemoService {
    * @returns Promise that resolves when categories have been saved
    */
   private async saveCategories(): Promise<void> {
-    await this.context.globalState.update(
+    await this.storageService.setValue(
       LocalMemoService.CATEGORIES_KEY,
       this.categories
     );

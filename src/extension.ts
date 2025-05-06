@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 // Import services
 import { LocalMemoService } from "./services/local-data-service";
 import { GitlabClient } from "./services/gitlab-service"; // Renamed to GitlabClient, handles cloud
+import { StorageService } from "./services/storage-service"; // Import StorageService
+import { ConfigurationService } from "./services/configuration-service"; // Import ConfigurationService
 
 // Import view provider and required types
 import {
@@ -54,9 +56,13 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log('"cursor-memo" is now active!');
 
   // --- Initialization ---
-  // Instantiate both services
-  const localMemoService = new LocalMemoService(context);
-  const gitlabService = new GitlabClient(context);
+  // Instantiate core services first
+  const storageService = new StorageService(context);
+  const configService = new ConfigurationService(context);
+
+  // Instantiate dependent services, injecting dependencies
+  const localMemoService = new LocalMemoService(storageService);
+  const gitlabService = new GitlabClient(storageService, configService);
 
   // Initialize both services (they load their respective data)
   await localMemoService.initialize();
@@ -155,20 +161,6 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(commandId, commands[commandId])
     );
   }
-
-  // --- Watch for configuration changes (e.g., GitLab settings) ---
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("cursorMemo.gitlab")) {
-        // Optionally trigger a refresh or notify user if GitLab config changes
-        vscode.window.showInformationMessage(
-          "GitLab configuration changed. You may need to sync again."
-        );
-        // Trigger refresh to potentially update GitLabClient state if needed by TreeView
-        memoTreeProvider.updateView();
-      }
-    })
-  );
 
   // Initial refresh to load data into the view
   memoTreeProvider.updateView();
