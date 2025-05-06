@@ -84,6 +84,8 @@ export function createPushToGitLabHandler(
     const selectedItems = await uiService.showQuickPick(quickPickItems, {
       placeHolder: "Select prompts to push to GitLab",
       canPickMany: true,
+      matchOnDescription: true,
+      matchOnDetail: true,
     });
 
     if (!selectedItems || selectedItems.length === 0) {
