@@ -389,8 +389,11 @@ export class VSCodeUserInteractionService {
   }
 
   async writeCursorChat(text: string): Promise<void> {
-    await this.openCursorChat();
     await this.writeClipboard(text);
-    await this.pasteClipboard();
+    await this.openCursorChat();
+
+    setTimeout(async () => {
+      await this.pasteClipboard();
+    }, 100);
   }
 }
