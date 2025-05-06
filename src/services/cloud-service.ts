@@ -182,16 +182,28 @@ export class CloudService {
       )
     );
 
-    this.cloudCommands = filteredCommands.map((cmd) => ({
+    // 获取所有新命令，并标记为云命令
+    const newCloudCommands = filteredCommands.map((cmd) => ({
       ...cmd,
       isCloud: true,
     }));
+
+    // 从现有云命令中移除与新选定类别冲突的命令
+    const existingCommands = this.cloudCommands.filter(
+      (cmd) =>
+        !selectedCategories.includes(
+          cmd.categoryId || CloudService.DEFAULT_CATEGORY
+        )
+    );
+
+    // 合并现有命令和新命令
+    this.cloudCommands = [...existingCommands, ...newCloudCommands];
 
     await this.saveCloudCommands();
     this._onDidCloudCommandsChange.fire();
     return {
       success: true,
-      data: { syncedCommands: this.cloudCommands.length },
+      data: { syncedCommands: newCloudCommands.length },
     };
   }
 

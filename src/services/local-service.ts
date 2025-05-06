@@ -35,6 +35,7 @@ export class LocalService {
    * Initialize the local data service
    * Loads local commands and categories from global state
    * Ensures all commands have a category field and the default category exists
+   * Cleans up corrupted category data and remaps affected commands.
    * @returns Promise that resolves when initialization is complete
    */
   public async initialize(): Promise<void> {
@@ -42,38 +43,118 @@ export class LocalService {
       return;
     }
 
+    // 1. Load commands and fix missing categoryId
     const storedCommands = this.storageService.getValue<MemoItem[]>(
       LocalService.STORAGE_KEY,
       []
     );
-
+    let commandsInitiallyModified = false;
     this.commands = storedCommands.map((cmd) => {
-      if (!cmd.categoryId) {
+      if (!cmd.categoryId?.trim()) {
+        // Check for null, undefined, or empty categoryId
+        commandsInitiallyModified = true;
         return { ...cmd, categoryId: LocalService.DEFAULT_CATEGORY };
       }
       return cmd;
     });
 
-    if (JSON.stringify(storedCommands) !== JSON.stringify(this.commands)) {
+    if (commandsInitiallyModified) {
       await this.saveCommands();
     }
 
+    // 2. Load categories
     const storedCategories = this.storageService.getValue<Category[]>(
       LocalService.CATEGORIES_KEY,
       []
     );
-    this.categories = storedCategories;
 
-    if (
-      !this.categories.some((cat) => cat.id === LocalService.DEFAULT_CATEGORY)
-    ) {
+    // 3. Clean categories
+    const pristineCategories: Category[] = [];
+    const corruptedCategorySourceIds = new Set<string>();
+    let categoriesListChangedDuringCleanup = false;
+
+    for (const category of storedCategories) {
+      const isDefaultCandidateById =
+        category.id === LocalService.DEFAULT_CATEGORY;
+      const isCorrupted = !category.id?.trim() || !category.name?.trim();
+
+      if (isCorrupted) {
+        categoriesListChangedDuringCleanup = true; // Mark that original list is different
+        if (!isDefaultCandidateById && category.id?.trim()) {
+          // If it's a corrupted non-Default category with a somewhat valid original ID, record it for command migration.
+          corruptedCategorySourceIds.add(category.id.trim());
+        }
+        // Corrupted categories (including a corrupted Default) are not added to pristineCategories at this stage.
+        // Default category will be handled specifically later.
+      } else {
+        pristineCategories.push(category);
+      }
+    }
+    this.categories = pristineCategories; // Start with a list of non-corrupted categories
+
+    // 4. Migrate commands from corrupted categories
+    let commandsRemappedDuringCleanup = false;
+    if (corruptedCategorySourceIds.size > 0) {
+      const remappedCommands = this.commands.map((cmd) => {
+        if (cmd.categoryId && corruptedCategorySourceIds.has(cmd.categoryId)) {
+          commandsRemappedDuringCleanup = true;
+          return { ...cmd, categoryId: LocalService.DEFAULT_CATEGORY };
+        }
+        return cmd;
+      });
+      if (commandsRemappedDuringCleanup) {
+        this.commands = remappedCommands;
+      }
+    }
+
+    // 5. Ensure Default Category exists and is pristine
+    let defaultCategoryHandled = false;
+    const defaultCategoryIndex = this.categories.findIndex(
+      (cat) => cat.id === LocalService.DEFAULT_CATEGORY
+    );
+
+    if (defaultCategoryIndex === -1) {
+      // Default category is completely missing, add it.
       this.categories.push({
         id: LocalService.DEFAULT_CATEGORY,
         name: LocalService.DEFAULT_CATEGORY,
       });
+      defaultCategoryHandled = true;
+    } else {
+      // Default category exists, ensure its name is also "Default".
+      if (
+        this.categories[defaultCategoryIndex].name !==
+        LocalService.DEFAULT_CATEGORY
+      ) {
+        this.categories[defaultCategoryIndex].name =
+          LocalService.DEFAULT_CATEGORY;
+        defaultCategoryHandled = true;
+      }
+    }
+
+    const finalCategoriesChanged =
+      categoriesListChangedDuringCleanup || defaultCategoryHandled;
+
+    // 6. Save changes
+    if (finalCategoriesChanged) {
       await this.saveCategories();
     }
 
+    if (commandsRemappedDuringCleanup) {
+      // Only save if remapped during this cleanup phase
+      await this.saveCommands();
+    }
+
+    // 7. Fire events if data changed, so UI can update
+    if (finalCategoriesChanged) {
+      this._onDidCategoriesChange.fire();
+    }
+    // Fire if commands were modified either initially or during the cleanup
+    if (commandsInitiallyModified || commandsRemappedDuringCleanup) {
+      this._onDidCommandsChange.fire();
+    }
+
+    // 8. Mark initialization complete
     this.initialized = true;
   }
 
