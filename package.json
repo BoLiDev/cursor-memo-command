@@ -107,6 +107,12 @@
         "title": "Push to GitLab",
         "category": "Cursor Memo",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "cursor-memo.clearLocalStorage",
+        "title": "Clear Local Storage",
+        "category": "Cursor Memo",
+        "icon": "$(clear-all)"
       }
     ],
     "views": {

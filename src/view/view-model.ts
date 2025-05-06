@@ -182,9 +182,11 @@ export class MemoTreeViewModel {
   }
 
   public getSortedLocalCategories(): CategoryTreeItem[] {
-    return Array.from(this.localCategoryNodes.values()).sort((a, b) =>
-      a.category.name.localeCompare(b.category.name)
-    );
+    return Array.from(this.localCategoryNodes.values()).sort((a, b) => {
+      const nameA = a.category?.name || "";
+      const nameB = b.category?.name || "";
+      return nameA.localeCompare(nameB);
+    });
   }
 
   public getSortedCloudCategories(): CategoryTreeItem[] {
@@ -201,7 +203,11 @@ export class MemoTreeViewModel {
         }
         return true;
       })
-      .sort((a, b) => a.category.name.localeCompare(b.category.name));
+      .sort((a, b) => {
+        const nameA = a.category?.name || "";
+        const nameB = b.category?.name || "";
+        return nameA.localeCompare(nameB);
+      });
     return cloudCats;
   }
 

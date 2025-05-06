@@ -159,6 +159,36 @@ export async function activate(context: vscode.ExtensionContext) {
       uiService
     ),
 
+    // New command to clear local storage
+    "cursor-memo.clearLocalStorage": async () => {
+      const confirmSelection = await uiService.showQuickPick<
+        vscode.QuickPickItem & { C: string } // C is the custom value type
+      >(
+        [
+          { label: "Yes", C: "Yes" },
+          { label: "No", C: "No" },
+        ],
+        {
+          placeHolder:
+            "Are you sure you want to clear all local memo data? This cannot be undone.",
+        }
+      );
+
+      if (confirmSelection && confirmSelection.C === "Yes") {
+        try {
+          await localMemoService.clearAllLocalData();
+          vscode.window.showInformationMessage(
+            "Local memo storage has been cleared."
+          );
+        } catch (error: any) {
+          // Explicitly type error as any or unknown
+          vscode.window.showErrorMessage(
+            `Error clearing local storage: ${error.message || error}`
+          );
+        }
+      }
+    },
+
     // Refresh command
     "cursor-memo.refresh": async () => {
       // console.log(

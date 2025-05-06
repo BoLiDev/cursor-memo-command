@@ -514,4 +514,24 @@ export class LocalService {
       this.categories
     );
   }
+
+  /**
+   * Clears all local memos and categories, then re-initializes the default category.
+   * @returns Promise that resolves when all data is cleared and default category is saved.
+   */
+  public async clearAllLocalData(): Promise<void> {
+    this.commands = [];
+    this.categories = [
+      {
+        id: LocalService.DEFAULT_CATEGORY,
+        name: LocalService.DEFAULT_CATEGORY,
+      },
+    ];
+
+    await this.saveCommands();
+    await this.saveCategories();
+
+    this._onDidCommandsChange.fire();
+    this._onDidCategoriesChange.fire();
+  }
 }
