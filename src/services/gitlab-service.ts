@@ -644,14 +644,14 @@ export class GitlabClient {
   }
 
   /**
-   * 将本地选定的 prompt 推送到 GitLab 仓库（通过创建合并请求）
-   * @param selectedCategories 选定的本地分类名称数组
-   * @param localMemoService 本地 memo 服务
+   * 将指定的命令推送到 GitLab 仓库（通过创建合并请求）
+   * @param commands 要推送的命令数组
+   * @param categories 涉及的分类数组
    * @returns 推送结果
    */
-  public async pushSelectedToGitLab(
-    selectedCategories: string[],
-    localMemoService: LocalMemoService
+  public async pushCommandsToGitLab(
+    commands: MemoItem[],
+    categories: string[]
   ): Promise<{
     success: boolean;
     mergeRequestUrl?: string;
@@ -659,7 +659,6 @@ export class GitlabClient {
     error?: string;
   }> {
     try {
-      // 1. 获取 GitLab 访问令牌
       const token = await this.getToken();
       if (!token) {
         return {
@@ -669,12 +668,7 @@ export class GitlabClient {
         };
       }
 
-      // 2. 获取要推送的本地命令
-      const localCommands = localMemoService
-        .getCommands()
-        .filter((cmd) => selectedCategories.includes(cmd.category));
-
-      if (localCommands.length === 0) {
+      if (commands.length === 0) {
         return {
           success: false,
           pushedCommands: 0,
@@ -682,7 +676,6 @@ export class GitlabClient {
         };
       }
 
-      // 3. 获取远程文件内容
       const fetchResult = await this.fetchTeamCommands();
       if (!fetchResult.success) {
         return {
@@ -692,19 +685,15 @@ export class GitlabClient {
         };
       }
 
-      // 4. 合并本地和远程命令
       const remoteCommands = fetchResult.data?.commands || [];
       const remoteCategories = fetchResult.data?.categories || [];
 
-      // 创建合并后的命令和类别集
       const mergedCommands = [...remoteCommands];
       const mergedCategories = new Set(remoteCategories);
 
-      // 添加本地命令到合并列表
       let newCommandsCount = 0;
 
-      for (const localCommand of localCommands) {
-        // 去掉本地属性，准备推送
+      for (const localCommand of commands) {
         const commandToAdd = {
           id: localCommand.id.includes("_imported_")
             ? localCommand.id.split("_imported_")[0]
@@ -716,25 +705,20 @@ export class GitlabClient {
           alias: localCommand.alias,
         };
 
-        // 检查是否存在同ID命令
         const existingIndex = mergedCommands.findIndex(
           (cmd) => cmd.id === commandToAdd.id
         );
 
         if (existingIndex >= 0) {
-          // 更新现有命令
           mergedCommands[existingIndex] = commandToAdd;
         } else {
-          // 添加新命令
           mergedCommands.push(commandToAdd);
           newCommandsCount++;
         }
 
-        // 添加类别
         mergedCategories.add(localCommand.category);
       }
 
-      // 5. 准备新的文件内容
       const newFileContent = JSON.stringify(
         {
           commands: mergedCommands,
@@ -744,7 +728,6 @@ export class GitlabClient {
         2
       );
 
-      // 6. 创建新分支
       const timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
       const branchName = `cursor_memo_update_${timestamp}`;
 
@@ -757,13 +740,12 @@ export class GitlabClient {
         };
       }
 
-      // 7. 提交文件
       const commitResult = await this.commitFileChange(
         token,
         branchName,
         this.filePath,
         newFileContent,
-        `Update prompt commands: added ${newCommandsCount} new commands, updated ${localCommands.length - newCommandsCount} commands.`
+        `Update prompt commands: added ${newCommandsCount} new commands, updated ${commands.length - newCommandsCount} commands.`
       );
 
       if (!commitResult.success) {
@@ -774,13 +756,12 @@ export class GitlabClient {
         };
       }
 
-      // 8. 创建合并请求
       const mrResult = await this.createMergeRequest(
         token,
         branchName,
-        this.branch, // 目标分支是配置的主分支
+        this.branch,
         `Update prompt commands from ${os.hostname() || "local"}`,
-        `This merge request adds ${newCommandsCount} new commands and updates ${localCommands.length - newCommandsCount} existing commands in categories: ${selectedCategories.join(", ")}.`
+        `This merge request adds ${newCommandsCount} new commands and updates ${commands.length - newCommandsCount} existing commands from categories: ${categories.join(", ")}.`
       );
 
       if (!mrResult.success) {
@@ -794,7 +775,7 @@ export class GitlabClient {
       return {
         success: true,
         mergeRequestUrl: mrResult.mergeRequestUrl,
-        pushedCommands: localCommands.length,
+        pushedCommands: commands.length,
       };
     } catch (error: any) {
       console.error("Error pushing to GitLab:", error);
@@ -804,6 +785,36 @@ export class GitlabClient {
         error: error.message || "Unknown error during push operation.",
       };
     }
+  }
+
+  /**
+   * 将本地选定的 prompt 推送到 GitLab 仓库（通过创建合并请求）
+   * @param selectedCategories 选定的本地分类名称数组
+   * @param localMemoService 本地 memo 服务
+   * @returns 推送结果
+   */
+  public async pushCategoriesToGitLab(
+    selectedCategories: string[],
+    localMemoService: LocalMemoService
+  ): Promise<{
+    success: boolean;
+    mergeRequestUrl?: string;
+    pushedCommands: number;
+    error?: string;
+  }> {
+    const localCommands = localMemoService
+      .getCommands()
+      .filter((cmd) => selectedCategories.includes(cmd.category));
+
+    if (localCommands.length === 0) {
+      return {
+        success: false,
+        pushedCommands: 0,
+        error: "No commands selected for pushing.",
+      };
+    }
+
+    return this.pushCommandsToGitLab(localCommands, selectedCategories);
   }
 }
 

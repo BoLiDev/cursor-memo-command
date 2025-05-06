@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { GitlabClient } from "../services/gitlab-service";
 import { LocalMemoService } from "../services/local-data-service";
 import { MemoTreeDataProvider } from "../view/tree-provider";
+import { MemoItem } from "../models/memo-item";
 
 /**
  * 创建"推送到 GitLab"命令处理器
@@ -14,34 +15,43 @@ import { MemoTreeDataProvider } from "../view/tree-provider";
  */
 export function createPushToGitLabHandler(
   gitlabService: GitlabClient,
-  localMemoService: LocalMemoService,
-  memoTreeProvider: MemoTreeDataProvider
+  localMemoService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    // 1. 获取本地分类列表
-    const localCategories = localMemoService.getCategories();
+    const localCommands = localMemoService.getCommands();
 
-    if (localCategories.length === 0) {
+    if (localCommands.length === 0) {
       vscode.window.showInformationMessage(
-        "No local categories available to push"
+        "No local commands available to push"
       );
       return;
     }
 
-    // 2. 让用户选择要推送的分类
-    const selectedCategories = await vscode.window.showQuickPick(
-      localCategories,
+    const selectedCommands = await vscode.window.showQuickPick(
+      localCommands.map((cmd) => ({
+        label: cmd.alias || cmd.label,
+        description: cmd.category,
+        detail:
+          cmd.command.length > 60
+            ? `${cmd.command.substring(0, 60)}...`
+            : cmd.command,
+        command: cmd,
+      })),
       {
-        placeHolder: "Select categories to push to GitLab",
+        placeHolder: "Select commands to push to GitLab",
         canPickMany: true,
       }
     );
 
-    if (!selectedCategories || selectedCategories.length === 0) {
-      return; // 用户取消了操作
+    if (!selectedCommands || selectedCommands.length === 0) {
+      return;
     }
 
-    // 3. 显示进度提示，执行推送操作
+    const commandsToUpload = selectedCommands.map((item) => item.command);
+    const categories = [
+      ...new Set(commandsToUpload.map((cmd) => cmd.category)),
+    ];
+
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -52,30 +62,25 @@ export function createPushToGitLabHandler(
         progress.report({ message: "Preparing commands..." });
 
         try {
-          // 4. 执行推送操作
           progress.report({ message: "Creating merge request..." });
-          const result = await gitlabService.pushSelectedToGitLab(
-            selectedCategories,
-            localMemoService
+          const result = await gitlabService.pushCommandsToGitLab(
+            commandsToUpload,
+            categories
           );
 
-          // 5. 处理结果
           if (result.success) {
             const openMrAction = "Open Merge Request";
             const message = `Successfully pushed ${result.pushedCommands} commands to GitLab as a merge request.`;
 
-            // 显示成功消息并提供打开 MR 的按钮
             const selection = await vscode.window.showInformationMessage(
               message,
               openMrAction
             );
 
-            // 如果用户点击了"打开合并请求"按钮
             if (selection === openMrAction && result.mergeRequestUrl) {
               vscode.env.openExternal(vscode.Uri.parse(result.mergeRequestUrl));
             }
           } else {
-            // 显示错误消息
             vscode.window.showErrorMessage(
               `Error pushing to GitLab: ${result.error || "Unknown error"}`
             );

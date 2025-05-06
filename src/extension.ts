@@ -132,8 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
       createManageGitLabTokenHandler(gitlabService), // Pass gitlabService now
     "cursor-memo.pushToGitLab": createPushToGitLabHandler(
       gitlabService,
-      localMemoService,
-      memoTreeProvider
+      localMemoService
     ),
 
     // Data Transfer Commands (use localMemoService for local data export/import)
