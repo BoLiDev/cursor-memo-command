@@ -12,6 +12,7 @@ import { VscodeStorageService } from "./vscode-storage-service";
 import { ConfigurationService } from "./configuration-service";
 import { GitlabApiService, GitlabApiError } from "./cloud-api-service";
 import { z } from "zod";
+import { removeDuplicateCommands as utilsRemoveDuplicateCommands } from "../utils";
 
 export type CloudOperationResult<T> =
   | { success: true; data: T }
@@ -210,13 +211,13 @@ export class CloudService {
       )
     );
 
-    // 获取所有新命令，并标记为云命令
+    // Get all new commands and mark them as cloud commands
     const newCloudCommands = filteredCommands.map((cmd) => ({
       ...cmd,
       isCloud: true,
     }));
 
-    // 从现有云命令中移除与新选定类别冲突的命令
+    // Remove commands that conflict with selected categories from existing cloud commands
     const existingCommands = this.cloudCommands.filter(
       (cmd) =>
         !selectedCategories.includes(
@@ -224,7 +225,7 @@ export class CloudService {
         )
     );
 
-    // 合并现有命令和新命令
+    // Merge existing commands with new commands
     this.cloudCommands = [...existingCommands, ...newCloudCommands];
 
     // Update cloud categories with new selected categories
@@ -327,7 +328,7 @@ export class CloudService {
         ...cmd,
         alias: cmd.alias || cmd.label,
       }));
-      const uniqueCommands = removeDuplicateCommands(processedCommands);
+      const uniqueCommands = utilsRemoveDuplicateCommands(processedCommands);
       const commandsData = this._transformMemoItemsToStructure(uniqueCommands);
       const newFileContent = serializeCommands(commandsData);
       const newFileContentBase64 =
@@ -472,60 +473,4 @@ export class CloudService {
 
     return result;
   }
-}
-
-// TODO: Move this to a shared utility module?
-function removeDuplicateCommands(commands: MemoItem[]): MemoItem[] {
-  const finalMap = new Map<string, MemoItem>();
-
-  commands.forEach((cmd) => {
-    const aliasKey = `${cmd.categoryId}:${cmd.alias || cmd.label}`;
-    // Always add/overwrite by ID if present
-    if (cmd.id) {
-      const existingById = finalMap.get(cmd.id);
-      if (!existingById || !existingById.isCloud || cmd.isCloud === false) {
-        finalMap.set(cmd.id, cmd);
-      }
-    }
-    // Add/overwrite by alias+category key, preferring local
-    const existingByAlias = finalMap.get(aliasKey);
-    if (!existingByAlias || !existingByAlias.isCloud || cmd.isCloud === false) {
-      let alreadyPresentById = false;
-      if (cmd.id) {
-        finalMap.forEach((value, key) => {
-          if (value.id === cmd.id && key !== aliasKey && key !== cmd.id) {
-            alreadyPresentById = true;
-            if (!value.isCloud || cmd.isCloud === false) {
-              finalMap.delete(key);
-              finalMap.set(aliasKey, cmd);
-            }
-          }
-        });
-      }
-      if (!alreadyPresentById) {
-        finalMap.set(aliasKey, cmd);
-      }
-    }
-    // If cmd.id exists and is different from aliasKey, ensure it's in the map.
-    if (cmd.id && cmd.id !== aliasKey && !finalMap.has(cmd.id)) {
-      const existingById = finalMap.get(cmd.id);
-      if (!existingById || !existingById.isCloud || cmd.isCloud === false) {
-        finalMap.set(cmd.id, cmd);
-      }
-    }
-  });
-
-  // Filter results to ensure no duplicate IDs resulted from alias mapping overwrite
-  const uniqueByIdResult: MemoItem[] = [];
-  const seenIds = new Set<string>();
-  finalMap.forEach((item) => {
-    if (item.id && !seenIds.has(item.id)) {
-      uniqueByIdResult.push(item);
-      seenIds.add(item.id);
-    } else if (!item.id) {
-      uniqueByIdResult.push(item);
-    }
-  });
-
-  return uniqueByIdResult;
 }

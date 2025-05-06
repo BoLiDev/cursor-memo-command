@@ -39,8 +39,13 @@ export function createSaveCommandHandler(
     );
 
     if (commandText) {
-      await dataService.addCommand(commandText);
-      await uiService.showInformationMessage("Command saved");
+      const result = await dataService.addCommand(commandText);
+
+      if ("error" in result) {
+        await uiService.showErrorMessage(result.error);
+      } else {
+        await uiService.showInformationMessage("Command saved");
+      }
     }
   };
 }
@@ -87,10 +92,12 @@ export function createRenameCommandHandler(
     });
 
     if (alias !== undefined) {
-      const success = await dataService.renameCommand(item.id, alias);
+      const result = await dataService.renameCommand(item.id, alias);
 
-      if (success) {
+      if (result.success) {
         uiService.showInformationMessage("Command renamed");
+      } else if (result.error) {
+        uiService.showErrorMessage(result.error);
       }
     }
   };
@@ -132,10 +139,12 @@ export function createEditCommandHandler(
     );
 
     if (editedCommand !== undefined && editedCommand !== item.command) {
-      const success = await dataService.editCommand(item.id, editedCommand);
+      const result = await dataService.editCommand(item.id, editedCommand);
 
-      if (success) {
+      if (result.success) {
         uiService.showInformationMessage("Command updated");
+      } else if (result.error) {
+        uiService.showErrorMessage(result.error);
       }
     }
   };

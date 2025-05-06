@@ -164,9 +164,12 @@ async function importSelectedData(
   );
 
   if (result.success) {
-    await uiService.showInformationMessage(
-      `Imported ${result.importedCommands} commands and ${result.importedCategories} categories`
-    );
+    const message =
+      result.duplicateCommands > 0
+        ? `Imported ${result.importedCommands} commands and ${result.importedCategories} categories. Skipped ${result.duplicateCommands} duplicate commands.`
+        : `Imported ${result.importedCommands} commands and ${result.importedCategories} categories.`;
+
+    await uiService.showInformationMessage(message);
   } else {
     await uiService.showErrorMessage("Failed to import commands");
   }

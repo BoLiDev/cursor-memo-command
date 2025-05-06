@@ -9,6 +9,7 @@ import {
 } from "../zod";
 import { z } from "zod";
 import { Category } from "../models/category";
+import { filterOutDuplicates } from "../utils";
 
 /**
  * Service for handling data import and export operations for LOCAL data.
@@ -56,6 +57,7 @@ export class LocalTransferService {
   public async importData(jsonData: string): Promise<{
     success: boolean;
     importedCommands: number;
+    duplicateCommands: number;
     importedCategories: number;
   }> {
     try {
@@ -73,20 +75,31 @@ export class LocalTransferService {
         await this.localService.addCategories(newCategoryNames);
       }
 
+      // 获取当前命令，用于去重
+      const currentCommands = this.localService.getCommands();
+
+      // 过滤掉重复的命令
+      const uniqueCommands = filterOutDuplicates(commands, currentCommands);
+      const duplicateCount = commands.length - uniqueCommands.length;
+
       // 处理命令
-      if (commands.length > 0) {
-        await this.localService.addCommands(commands);
+      let addedCount = 0;
+      if (uniqueCommands.length > 0) {
+        const result = await this.localService.addCommands(uniqueCommands);
+        addedCount = result.added;
       }
 
       return {
         success: true,
-        importedCommands: commands.length,
+        importedCommands: addedCount,
+        duplicateCommands: duplicateCount,
         importedCategories: newCategoryNames.length,
       };
     } catch {
       return {
         success: false,
         importedCommands: 0,
+        duplicateCommands: 0,
         importedCategories: 0,
       };
     }
@@ -104,6 +117,7 @@ export class LocalTransferService {
   ): Promise<{
     success: boolean;
     importedCommands: number;
+    duplicateCommands: number;
     importedCategories: number;
   }> {
     try {
@@ -135,20 +149,34 @@ export class LocalTransferService {
         await this.localService.addCategories(newCategoryNames);
       }
 
+      // 获取当前命令，用于去重
+      const currentCommands = this.localService.getCommands();
+
+      // 过滤掉重复的命令
+      const uniqueCommands = filterOutDuplicates(
+        commandsFiltered,
+        currentCommands
+      );
+      const duplicateCount = commandsFiltered.length - uniqueCommands.length;
+
       // 处理命令
-      if (commandsFiltered.length > 0) {
-        await this.localService.addCommands(commandsFiltered);
+      let addedCount = 0;
+      if (uniqueCommands.length > 0) {
+        const result = await this.localService.addCommands(uniqueCommands);
+        addedCount = result.added;
       }
 
       return {
         success: true,
-        importedCommands: commandsFiltered.length,
+        importedCommands: addedCount,
+        duplicateCommands: duplicateCount,
         importedCategories: newCategoryNames.length,
       };
     } catch {
       return {
         success: false,
         importedCommands: 0,
+        duplicateCommands: 0,
         importedCategories: 0,
       };
     }

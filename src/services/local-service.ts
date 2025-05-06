@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
 import { Category } from "../models/category";
 import { VscodeStorageService } from "./vscode-storage-service";
+import { isDuplicateCommand, filterOutDuplicates } from "../utils";
 
 /**
  * Service for managing local memo items and categories.
@@ -197,12 +198,12 @@ export class LocalService {
    * Add a new local command
    * @param command The command content
    * @param categoryId The ID of the category the command belongs to, defaults to the default category ID
-   * @returns Promise containing the newly added command item
+   * @returns Promise containing the newly added command item or an error object
    */
   public async addCommand(
     command: string,
     categoryId: string = this.getDefaultCategoryId()
-  ): Promise<MemoItem> {
+  ): Promise<MemoItem | { error: string }> {
     if (!this.categories.some((cat) => cat.id === categoryId)) {
       categoryId = this.getDefaultCategoryId();
     }
@@ -216,6 +217,14 @@ export class LocalService {
       isCloud: false,
     };
 
+    // 检查是否存在重复
+    if (isDuplicateCommand(newItem, this.commands)) {
+      return {
+        error:
+          "A command with the same category, name and content already exists.",
+      };
+    }
+
     this.commands = [...this.commands, newItem];
     await this.saveCommands();
     this._onDidCommandsChange.fire();
@@ -225,21 +234,38 @@ export class LocalService {
   /**
    * Add multiple local commands
    * @param newCommands Array of command items to add
-   * @returns Promise that resolves when commands are added
+   * @returns Promise that resolves when commands are added, with the count of added commands and filtered duplicates
    */
-  public async addCommands(newCommands: MemoItem[]): Promise<void> {
-    const localNewCommands = newCommands.map((cmd) => ({
+  public async addCommands(newCommands: MemoItem[]): Promise<{
+    added: number;
+    duplicates: number;
+  }> {
+    // 准备要添加的命令，设置正确的分类和isCloud标志
+    const preparedCommands = newCommands.map((cmd) => ({
       ...cmd,
       categoryId: this.categories.some((cat) => cat.id === cmd.categoryId)
         ? cmd.categoryId
         : this.getDefaultCategoryId(),
       isCloud: false,
     }));
-    this.commands = [...this.commands, ...localNewCommands];
-    await this.saveCommands();
-    if (localNewCommands.length > 0) {
+
+    // 过滤掉已经存在的重复命令
+    const uniqueNewCommands = filterOutDuplicates(
+      preparedCommands,
+      this.commands
+    );
+    const duplicatesCount = preparedCommands.length - uniqueNewCommands.length;
+
+    if (uniqueNewCommands.length > 0) {
+      this.commands = [...this.commands, ...uniqueNewCommands];
+      await this.saveCommands();
       this._onDidCommandsChange.fire();
     }
+
+    return {
+      added: uniqueNewCommands.length,
+      duplicates: duplicatesCount,
+    };
   }
 
   /**
@@ -263,11 +289,31 @@ export class LocalService {
    * Rename a local command (set alias)
    * @param id The ID of the command to rename
    * @param alias The new alias
-   * @returns Promise<boolean> Whether the operation was successful
+   * @returns Promise containing the operation result and any error message
    */
-  public async renameCommand(id: string, alias: string): Promise<boolean> {
-    let updated = false;
+  public async renameCommand(
+    id: string,
+    alias: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const cmdToUpdate = this.commands.find((cmd) => cmd.id === id);
+    if (!cmdToUpdate) {
+      return { success: false, error: "Command not found." };
+    }
 
+    // 创建重命名后的命令对象进行检查
+    const updatedCmd: MemoItem = { ...cmdToUpdate, alias };
+
+    // 检查除了自身外是否存在重复
+    const otherCmds = this.commands.filter((cmd) => cmd.id !== id);
+    if (isDuplicateCommand(updatedCmd, otherCmds)) {
+      return {
+        success: false,
+        error:
+          "Renaming would create a duplicate command (same category, name and content).",
+      };
+    }
+
+    let updated = false;
     this.commands = this.commands.map((cmd) => {
       if (cmd.id === id) {
         updated = true;
@@ -279,26 +325,50 @@ export class LocalService {
     if (updated) {
       await this.saveCommands();
       this._onDidCommandsChange.fire();
-      return true;
+      return { success: true };
     }
-    return false;
+    return { success: false, error: "Renaming operation failed." };
   }
 
   /**
    * Edit local command content
    * @param id The ID of the command to edit
    * @param newCommand The new command content
-   * @returns Promise<boolean> Whether the operation was successful
+   * @returns Promise containing the operation result and any error message
    */
-  public async editCommand(id: string, newCommand: string): Promise<boolean> {
-    let updated = false;
+  public async editCommand(
+    id: string,
+    newCommand: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const cmdToUpdate = this.commands.find((cmd) => cmd.id === id);
+    if (!cmdToUpdate) {
+      return { success: false, error: "Command not found." };
+    }
 
+    const newLabel =
+      newCommand.length > 30 ? `${newCommand.slice(0, 30)}...` : newCommand;
+
+    // 创建编辑后的命令对象进行检查
+    const updatedCmd: MemoItem = {
+      ...cmdToUpdate,
+      command: newCommand,
+      label: cmdToUpdate.alias ? cmdToUpdate.label : newLabel,
+    };
+
+    // 检查除了自身外是否存在重复
+    const otherCmds = this.commands.filter((cmd) => cmd.id !== id);
+    if (isDuplicateCommand(updatedCmd, otherCmds)) {
+      return {
+        success: false,
+        error:
+          "Editing would create a duplicate command (same category, name and content).",
+      };
+    }
+
+    let updated = false;
     this.commands = this.commands.map((cmd) => {
       if (cmd.id === id) {
         updated = true;
-        const newLabel =
-          newCommand.length > 30 ? `${newCommand.slice(0, 30)}...` : newCommand;
-
         return {
           ...cmd,
           command: newCommand,
@@ -311,9 +381,9 @@ export class LocalService {
     if (updated) {
       await this.saveCommands();
       this._onDidCommandsChange.fire();
-      return true;
+      return { success: true };
     }
-    return false;
+    return { success: false, error: "Editing operation failed." };
   }
 
   /**
@@ -469,19 +539,42 @@ export class LocalService {
    * Move a local command to a different local category
    * @param commandId The ID of the command to move
    * @param targetCategoryId The ID of the category to move the command to
-   * @returns Promise<boolean> Whether the operation was successful
+   * @returns Promise containing the operation result and any error message
    */
   public async moveCommandToCategory(
     commandId: string,
     targetCategoryId: string
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.categories.some((cat) => cat.id === targetCategoryId)) {
-      return false;
+      return { success: false, error: "Target category does not exist." };
+    }
+
+    const cmdToMove = this.commands.find((cmd) => cmd.id === commandId);
+    if (!cmdToMove) {
+      return { success: false, error: "Command not found." };
+    }
+
+    // 如果命令已经在目标分类中，不需要移动
+    if (cmdToMove.categoryId === targetCategoryId) {
+      return { success: true };
+    }
+
+    // 创建移动后的命令对象进行检查
+    const movedCmd: MemoItem = { ...cmdToMove, categoryId: targetCategoryId };
+
+    // 检查除了自身外是否存在重复
+    const otherCmds = this.commands.filter((cmd) => cmd.id !== commandId);
+    if (isDuplicateCommand(movedCmd, otherCmds)) {
+      return {
+        success: false,
+        error:
+          "Moving would create a duplicate command in the target category (same category, name and content).",
+      };
     }
 
     let updated = false;
     this.commands = this.commands.map((cmd) => {
-      if (cmd.id === commandId && cmd.categoryId !== targetCategoryId) {
+      if (cmd.id === commandId) {
         updated = true;
         return { ...cmd, categoryId: targetCategoryId };
       }
@@ -491,9 +584,9 @@ export class LocalService {
     if (updated) {
       await this.saveCommands();
       this._onDidCommandsChange.fire();
-      return true;
+      return { success: true };
     }
-    return false;
+    return { success: false, error: "Moving operation failed." };
   }
 
   /**

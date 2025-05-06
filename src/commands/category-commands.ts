@@ -183,15 +183,17 @@ export function createMoveToCategoryHandler(
       );
 
     if (selectedCategoryItem) {
-      const success = await dataService.moveCommandToCategory(
+      const result = await dataService.moveCommandToCategory(
         item.id,
         selectedCategoryItem.category.id
       );
 
-      if (success) {
+      if (result.success) {
         await uiService.showInformationMessage(
           `Command moved to "${selectedCategoryItem.category.name}"`
         );
+      } else if (result.error) {
+        await uiService.showErrorMessage(result.error);
       }
     }
   };
@@ -226,10 +228,18 @@ export function createAddCommandToCategoryHandler(
     );
 
     if (commandText) {
-      await dataService.addCommand(commandText, categoryItem.category.id);
-      await uiService.showInformationMessage(
-        `Command added to "${categoryName}"`
+      const result = await dataService.addCommand(
+        commandText,
+        categoryItem.category.id
       );
+
+      if ("error" in result) {
+        await uiService.showErrorMessage(result.error);
+      } else {
+        await uiService.showInformationMessage(
+          `Command added to "${categoryName}"`
+        );
+      }
     }
   };
 }
