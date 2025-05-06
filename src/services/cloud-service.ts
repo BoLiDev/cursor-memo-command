@@ -48,9 +48,6 @@ export class CloudService {
     }
     await this.loadCloudCommands();
     this.initialized = true;
-    console.log(
-      `CloudStoreService initialized with ${this.cloudCommands.length} commands.`
-    );
   }
 
   /**
@@ -105,9 +102,6 @@ export class CloudService {
       const fileData = await this.gitlabApiService.getFileContent();
 
       if (!fileData.content) {
-        console.error(
-          "getFileContent returned success but content was missing."
-        );
         return {
           success: false,
           error: "File content is empty or missing in GitLab response.",
@@ -127,14 +121,12 @@ export class CloudService {
           data: { commands: commands as MemoItem[], categories },
         };
       } catch (parseError: any) {
-        console.error("Failed to parse command data:", parseError);
         return {
           success: false,
           error: `Invalid command data: ${parseError.message}`,
         };
       }
     } catch (error) {
-      console.error("Failed to fetch team commands from GitLab:", error);
       if (error instanceof GitlabApiError && error.status === 401) {
         return { success: false, error: error.message, needsAuth: true };
       }
@@ -165,7 +157,6 @@ export class CloudService {
 
     await this.saveCloudCommands();
     this._onDidCloudCommandsChange.fire();
-    console.log(`Synced ${this.cloudCommands.length} commands from GitLab.`);
     return {
       success: true,
       data: { syncedCommands: this.cloudCommands.length },
@@ -198,9 +189,6 @@ export class CloudService {
 
     await this.saveCloudCommands();
     this._onDidCloudCommandsChange.fire();
-    console.log(
-      `Synced ${this.cloudCommands.length} commands from selected categories: ${selectedCategories.join(", ")}`
-    );
     return {
       success: true,
       data: { syncedCommands: this.cloudCommands.length },
@@ -236,14 +224,8 @@ export class CloudService {
     if (removedCount > 0) {
       await this.saveCloudCommands();
       this._onDidCloudCommandsChange.fire();
-      console.log(
-        `Removed cloud category '${categoryName}' (${removedCount} commands) from local store.`
-      );
       return { success: true, removedCommands: removedCount };
     } else {
-      console.log(
-        `Cloud category '${categoryName}' not found in local store or had no commands.`
-      );
       return { success: true, removedCommands: 0 };
     }
   }
@@ -266,7 +248,6 @@ export class CloudService {
 
     try {
       // 1. Fetch current remote state
-      console.log("Fetching remote state before push...");
       const fetchResult = await this.fetchAndParseTeamCommands();
 
       let remoteCommands: MemoItem[] = [];
@@ -280,7 +261,6 @@ export class CloudService {
           error: `Failed to fetch remote state: ${fetchResult.error}`,
         };
       }
-      console.log(`Fetched ${remoteCommands.length} remote commands.`);
 
       // 2. Merge and prepare new content
       const allCommands = [...remoteCommands, ...commandsToPush];
@@ -296,45 +276,32 @@ export class CloudService {
 
       const newCommandsCount = uniqueCommands.length - remoteCommands.length;
       const updatedCount = commandsToPush.length - newCommandsCount;
-      console.log(
-        `Prepared content: ${uniqueCommands.length} total unique commands (${newCommandsCount} new, ${updatedCount} updated).`
-      );
 
       // 3. Create Branch
       const timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
       const branchName = `cursor_memo_update_${timestamp}`;
-      console.log(`Creating branch: ${branchName}...`);
       await this.gitlabApiService.createBranch(branchName);
-      console.log(`Branch ${branchName} created.`);
 
       // 4. Commit File
       const filePath = this.configService.getGitlabFilePath();
       const commitMessage = `Update prompt commands: added ${newCommandsCount} new, updated ${updatedCount}.`;
-      console.log(
-        `Committing changes to ${filePath} on branch ${branchName}...`
-      );
       await this.gitlabApiService.commitFileChange(
         branchName,
         filePath,
         newFileContentBase64,
         commitMessage
       );
-      console.log(`Changes committed.`);
 
       // 5. Create Merge Request
       const targetBranch = this.configService.getGitlabBranch();
       const mrTitle = `Update prompt commands from ${os.hostname() || "local"}`;
       const mrDescription = `This merge request adds ${newCommandsCount} new command(s) and updates ${updatedCount} existing command(s) from categories: ${involvedCategories.join(", ")}.`;
-      console.log(
-        `Creating merge request from ${branchName} to ${targetBranch}...`
-      );
       const mrResult = await this.gitlabApiService.createMergeRequest(
         branchName,
         targetBranch,
         mrTitle,
         mrDescription
       );
-      console.log(`Merge request created: ${mrResult.web_url}`);
 
       return {
         success: true,
@@ -344,7 +311,6 @@ export class CloudService {
         },
       };
     } catch (error) {
-      console.error("Error during pushCommandsToGitLab:", error);
       if (error instanceof GitlabApiError && error.status === 401) {
         return { success: false, error: error.message, needsAuth: true };
       }
@@ -361,7 +327,6 @@ export class CloudService {
    */
   public async setToken(token: string): Promise<void> {
     await this.storageService.setSecret(CloudService.GITLAB_TOKEN_KEY, token);
-    console.log("GitLab token stored.");
   }
 
   /**
@@ -369,7 +334,6 @@ export class CloudService {
    */
   public async clearToken(): Promise<void> {
     await this.storageService.deleteSecret(CloudService.GITLAB_TOKEN_KEY);
-    console.log("GitLab token cleared.");
   }
 
   private async saveCloudCommands(): Promise<void> {
@@ -409,10 +373,6 @@ export class CloudService {
         result[categoryName][alias] = {
           content: item.command,
         };
-      } else {
-        console.warn(
-          `Alias collision detected in category '${categoryName}' for alias '${alias}'. Keeping first encountered item during transformation.`
-        );
       }
     });
 
@@ -422,9 +382,6 @@ export class CloudService {
 
 // TODO: Move this to a shared utility module?
 function removeDuplicateCommands(commands: MemoItem[]): MemoItem[] {
-  const idMap = new Map<string, MemoItem>();
-  const aliasMap = new Map<string, MemoItem>();
-
   const finalMap = new Map<string, MemoItem>();
 
   commands.forEach((cmd) => {

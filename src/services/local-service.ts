@@ -49,9 +49,6 @@ export class LocalService {
 
     this.commands = storedCommands.map((cmd) => {
       if (!cmd.categoryId) {
-        console.warn(
-          `Command ${cmd.id} missing categoryId, assigning to Default.`
-        );
         return { ...cmd, categoryId: LocalService.DEFAULT_CATEGORY };
       }
       return cmd;
@@ -126,9 +123,6 @@ export class LocalService {
     categoryId: string = this.getDefaultCategoryId()
   ): Promise<MemoItem> {
     if (!this.categories.some((cat) => cat.id === categoryId)) {
-      console.warn(
-        `Attempted to add command to non-existent category ID: ${categoryId}. Assigning to Default.`
-      );
       categoryId = this.getDefaultCategoryId();
     }
 

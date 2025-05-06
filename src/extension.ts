@@ -51,8 +51,6 @@ let memoTreeView: vscode.TreeView<
  * @param context Extension context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('"cursor-memo" is now active!');
-
   // Instantiate core services first
   const storageService = new VscodeStorageService(context);
   const configService = new ConfigurationService(context);
@@ -96,7 +94,10 @@ export async function activate(context: vscode.ExtensionContext) {
       localMemoService,
       uiService
     ),
-    "cursor-memo.removeCommand": createRemoveCommandHandler(localMemoService),
+    "cursor-memo.removeCommand": createRemoveCommandHandler(
+      localMemoService,
+      uiService
+    ),
     "cursor-memo.renameCommand": createRenameCommandHandler(
       localMemoService,
       uiService
@@ -160,9 +161,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Refresh command
     "cursor-memo.refresh": async () => {
-      console.log(
-        "Refresh triggered. View should update automatically via events."
-      );
+      // console.log(
+      //   "Refresh triggered. View should update automatically via events."
+      // );
     },
   };
 
@@ -178,7 +179,7 @@ export async function activate(context: vscode.ExtensionContext) {
  * Deactivate the extension
  */
 export function deactivate() {
-  console.log('"cursor-memo" is now deactivated!');
+  // console.log('"cursor-memo" is now deactivated!');
   // Note: TreeDataProvider and ViewModel disposals should be handled by VS Code
   // when the extension context subscriptions are disposed, including the memoTreeProvider pushed earlier.
 }

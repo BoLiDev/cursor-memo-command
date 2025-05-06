@@ -161,10 +161,6 @@ export class VSCodeUserInteractionService {
     inputBox.placeholder = placeHolder;
     inputBox.value = value;
     inputBox.ignoreFocusOut = true;
-    console.warn(
-      "createMultilineInputBox currently uses a standard persistent InputBox, not true multiline."
-    );
-
     inputBox.buttons = [
       {
         iconPath: new vscode.ThemeIcon("save"),
@@ -182,7 +178,7 @@ export class VSCodeUserInteractionService {
         inputBox.dispose();
       });
 
-      inputBox.onDidTriggerButton((button) => {
+      inputBox.onDidTriggerButton(() => {
         if (resolved) return;
         resolved = true;
         resolve(inputBox.value);

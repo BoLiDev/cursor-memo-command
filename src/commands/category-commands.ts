@@ -215,8 +215,8 @@ export function createAddCommandToCategoryHandler(
     let clipboardText = "";
     try {
       clipboardText = await uiService.readClipboard();
-    } catch (error) {
-      console.warn("Failed to read clipboard:", error);
+    } catch {
+      uiService.showErrorMessage("Failed to read clipboard");
     }
 
     const commandText = await uiService.createMultilineInputBox(

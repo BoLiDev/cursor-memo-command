@@ -59,7 +59,7 @@ export class LocalTransferService {
     importedCategories: number;
   }> {
     try {
-      const { commandsData, commands, categoryNames } =
+      const { commands, categoryNames } =
         this._parseAndTransformImportData(jsonData);
 
       // 处理分类
@@ -83,8 +83,7 @@ export class LocalTransferService {
         importedCommands: commands.length,
         importedCategories: newCategoryNames.length,
       };
-    } catch (error) {
-      console.error("Import error:", error);
+    } catch {
       return {
         success: false,
         importedCommands: 0,
@@ -108,8 +107,7 @@ export class LocalTransferService {
     importedCategories: number;
   }> {
     try {
-      const { commandsData, commands, categoryNames } =
-        this._parseAndTransformImportData(jsonData);
+      const { commandsData } = this._parseAndTransformImportData(jsonData);
 
       // 过滤出选中的分类
       const filteredData: z.infer<typeof CommandsStructureSchema> = {};
@@ -147,8 +145,7 @@ export class LocalTransferService {
         importedCommands: commandsFiltered.length,
         importedCategories: newCategoryNames.length,
       };
-    } catch (error) {
-      console.error("Import error:", error);
+    } catch {
       return {
         success: false,
         importedCommands: 0,
@@ -231,10 +228,6 @@ export class LocalTransferService {
         result[categoryName][alias] = {
           content: item.command,
         };
-      } else {
-        console.warn(
-          `Export collision in category '${categoryName}' for alias '${alias}'. Keeping first encountered.`
-        );
       }
     });
 

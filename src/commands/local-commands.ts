@@ -9,8 +9,8 @@ import { VSCodeUserInteractionService } from "../services/vscode-user-interactio
 async function directPaste(): Promise<void> {
   try {
     await vscode.commands.executeCommand("editor.action.clipboardPasteAction");
-  } catch (error) {
-    console.error("Direct paste error:", error);
+  } catch {
+    // ignore
   }
 }
 
@@ -28,8 +28,8 @@ export function createSaveCommandHandler(
     let clipboardText = "";
     try {
       clipboardText = await uiService.readClipboard();
-    } catch (error) {
-      console.warn("Failed to read clipboard:", error);
+    } catch {
+      // ignore
     }
 
     const commandText = await uiService.createMultilineInputBox(
@@ -51,18 +51,18 @@ export function createSaveCommandHandler(
  * @returns The remove command handler function
  */
 export function createRemoveCommandHandler(
-  dataService: LocalService
+  dataService: LocalService,
+  uiService: VSCodeUserInteractionService
 ): (...args: any[]) => Promise<void> {
   return async (item: MemoItem) => {
     if (!item) return;
 
-    // Directly remove the command without confirmation
     const success = await dataService.removeCommand(item.id);
 
     if (success) {
-      console.log("Command deleted successfully (no UI message shown).");
+      uiService.showInformationMessage("Command deleted");
     } else {
-      console.error("Failed to delete command (no UI message shown).");
+      uiService.showErrorMessage("Failed to delete command");
     }
   };
 }

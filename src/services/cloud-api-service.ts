@@ -90,10 +90,6 @@ export class GitlabApiService {
       const fileData = await response.json();
       const validationResult = GitLabFileContentSchema.safeParse(fileData);
       if (!validationResult.success) {
-        console.error(
-          "GitLab file metadata schema validation failed:",
-          validationResult.error.errors
-        );
         throw new GitlabApiError(
           `Invalid file metadata format from GitLab: ${validationResult.error.message}`,
           500
@@ -101,7 +97,6 @@ export class GitlabApiService {
       }
       return validationResult.data;
     } catch (error) {
-      console.error(`Error in getFileContent for ${url}:`, error);
       if (error instanceof GitlabApiError) throw error;
       throw new GitlabApiError(
         error instanceof Error ? error.message : "Unknown error fetching file",
@@ -151,10 +146,6 @@ export class GitlabApiService {
       const validationResult = GitLabBranchResponseSchema.safeParse(data);
 
       if (!validationResult.success) {
-        console.error(
-          "Branch creation response validation failed:",
-          validationResult.error.errors
-        );
         throw new GitlabApiError(
           "Invalid branch creation response format",
           500
@@ -162,7 +153,6 @@ export class GitlabApiService {
       }
       return validationResult.data;
     } catch (error: any) {
-      console.error(`Error creating branch in GitLab: ${error}`);
       if (error instanceof GitlabApiError) throw error;
       throw new GitlabApiError(
         error.message || "Unknown error creating branch",
@@ -219,8 +209,7 @@ export class GitlabApiService {
         } else if (checkResponse.status !== 404) {
           await this.handleGitLabError(checkResponse);
         }
-      } catch (checkError) {
-        console.warn("File existence check failed, assuming POST:", checkError);
+      } catch {
         method = "POST";
       }
 
@@ -246,15 +235,10 @@ export class GitlabApiService {
       const validationResult = GitLabFileCommitResponseSchema.safeParse(data);
 
       if (!validationResult.success) {
-        console.error(
-          "File commit response validation failed:",
-          validationResult.error.errors
-        );
         throw new GitlabApiError("Invalid file commit response format", 500);
       }
       return validationResult.data;
     } catch (error: any) {
-      console.error(`Error committing file to GitLab: ${error}`);
       if (error instanceof GitlabApiError) throw error;
       throw new GitlabApiError(
         error.message || "Unknown error committing file",
@@ -310,10 +294,6 @@ export class GitlabApiService {
       const validationResult = GitLabMergeRequestResponseSchema.safeParse(data);
 
       if (!validationResult.success) {
-        console.error(
-          "Merge request creation response validation failed:",
-          validationResult.error.errors
-        );
         throw new GitlabApiError(
           "Invalid merge request creation response format",
           500
@@ -321,7 +301,6 @@ export class GitlabApiService {
       }
       return validationResult.data;
     } catch (error: any) {
-      console.error(`Error creating merge request in GitLab: ${error}`);
       if (error instanceof GitlabApiError) throw error;
       throw new GitlabApiError(
         error.message || "Unknown error creating merge request",
@@ -336,7 +315,6 @@ export class GitlabApiService {
   private async handleGitLabError(response: Response): Promise<void> {
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`GitLab API Error (${response.status}): ${errorBody}`);
       let message = `GitLab API error: ${response.status} ${response.statusText}.`;
 
       switch (response.status) {

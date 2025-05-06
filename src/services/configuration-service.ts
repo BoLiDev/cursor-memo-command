@@ -24,7 +24,6 @@ export class ConfigurationService {
     context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration(this.configSection)) {
-          console.log("Configuration changed, reloading...");
           this.loadConfiguration();
           this._onDidChangeConfiguration.fire();
         }
@@ -68,7 +67,6 @@ export class ConfigurationService {
  */
 function normalizeGitLabDomain(url?: string): string {
   if (!url) {
-    console.warn("GitLab domain not configured, defaulting to gitlab.com");
     return "https://gitlab.com/api/v4";
   }
 

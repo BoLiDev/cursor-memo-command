@@ -8,12 +8,7 @@ export default [
   { languageOptions: { globals: globals.node } },
   pluginJs.configs.recommended,
   {
-    plugins: { "@typescript-eslint": tseslintPlugin },
-    rules: tseslintPlugin.configs.recommended.rules,
-  },
-  eslintPluginPrettierRecommended,
-  {
-    files: ["**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parser: tseslintParser,
       parserOptions: {
@@ -22,16 +17,25 @@ export default [
         project: "./tsconfig.json",
       },
     },
+    plugins: {
+      "@typescript-eslint": tseslintPlugin,
+    },
     rules: {
+      ...tseslintPlugin.configs.recommended.rules,
+      "no-undef": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
         "warn",
-        { argsIgnorePattern: "^_" },
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "no-console": "warn",
     },
   },
+  eslintPluginPrettierRecommended,
   {
     ignores: ["node_modules/", "dist/", "out/"],
+  },
+  {
+    files: ["**/*.js"],
   },
 ];

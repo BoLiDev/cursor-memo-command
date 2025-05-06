@@ -51,15 +51,12 @@ export class MemoTreeViewModel {
 
     this.disposables.push(
       this.localDataService.onDidCommandsChange(() => {
-        console.log("ViewModel: Received local commands change event.");
         this.update();
       }),
       this.localDataService.onDidCategoriesChange(() => {
-        console.log("ViewModel: Received local categories change event.");
         this.update();
       }),
       this.cloudStoreService.onDidCloudCommandsChange(() => {
-        console.log("ViewModel: Received cloud commands change event.");
         this.update();
       })
     );
@@ -71,7 +68,6 @@ export class MemoTreeViewModel {
    * Update the view model state from the data services
    */
   public update(): void {
-    console.log("ViewModel: Updating data...");
     // Fetch latest data
     this.localCommands = this.localDataService.getCommands();
     this.cloudCommands = this.cloudStoreService.getCloudCommands();
@@ -87,7 +83,6 @@ export class MemoTreeViewModel {
 
     // Rebuild category nodes
     this.rebuildCategoryNodes();
-    console.log("ViewModel: Data updated, firing event.");
     this._onDidViewModelUpdate.fire();
   }
 

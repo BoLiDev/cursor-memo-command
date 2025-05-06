@@ -60,9 +60,6 @@ export class MemoTreeDataProvider
     );
 
     this.viewModelListener = this.viewModel.onDidViewModelUpdate(() => {
-      console.log(
-        "TreeProvider: Received view model update, firing tree data change."
-      );
       this._onDidChangeTreeData.fire();
     });
   }
