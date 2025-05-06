@@ -3,15 +3,13 @@
 import * as vscode from "vscode";
 import { GitlabClient } from "../services/gitlab-service";
 import { LocalMemoService } from "../services/local-data-service";
-import { MemoTreeDataProvider } from "../view/tree-provider";
 import { MemoItem } from "../models/memo-item";
 
 /**
- * 创建"推送到 GitLab"命令处理器
- * @param gitlabService GitLab 服务客户端
- * @param localMemoService 本地 memo 服务
- * @param memoTreeProvider memo 树形数据提供者
- * @returns "推送到 GitLab"命令处理函数
+ * Creates a "Push to GitLab" command handler
+ * @param gitlabService GitLab service client
+ * @param localMemoService Local memo service
+ * @returns "Push to GitLab" command handler
  */
 export function createPushToGitLabHandler(
   gitlabService: GitlabClient,
@@ -27,30 +25,80 @@ export function createPushToGitLabHandler(
       return;
     }
 
-    const selectedCommands = await vscode.window.showQuickPick(
-      localCommands.map((cmd) => ({
-        label: cmd.alias || cmd.label,
-        description: cmd.category,
-        detail:
-          cmd.command.length > 60
-            ? `${cmd.command.substring(0, 60)}...`
-            : cmd.command,
-        command: cmd,
-      })),
-      {
-        placeHolder: "Select commands to push to GitLab",
-        canPickMany: true,
-      }
-    );
+    // Group commands by category for display
+    const quickPickItems: (vscode.QuickPickItem & {
+      command?: MemoItem;
+      isSeparator?: boolean;
+    })[] = [];
 
-    if (!selectedCommands || selectedCommands.length === 0) {
+    // Create a mapping of category to commands for display
+    const commandsByCategory: { [category: string]: MemoItem[] } = {};
+    localCommands.forEach((cmd) => {
+      if (!commandsByCategory[cmd.category]) {
+        commandsByCategory[cmd.category] = [];
+      }
+      commandsByCategory[cmd.category].push(cmd);
+    });
+
+    // Sort categories for display
+    const sortedCategories = Object.keys(commandsByCategory).sort();
+
+    sortedCategories.forEach((category) => {
+      // Add category title as a separator
+      quickPickItems.push({
+        label: `$(folder) ${category}`,
+        kind: vscode.QuickPickItemKind.Separator,
+        isSeparator: true,
+      });
+
+      // Add all commands in this category
+      commandsByCategory[category].forEach((cmd) => {
+        quickPickItems.push({
+          label: `$(terminal) ${cmd.alias || cmd.label}`,
+          description: cmd.category,
+          detail:
+            cmd.command.length > 60
+              ? `${cmd.command.substring(0, 60)}...`
+              : cmd.command,
+          command: cmd,
+        });
+      });
+    });
+
+    const selectedItems = await vscode.window.showQuickPick(quickPickItems, {
+      placeHolder: "Select commands to push to GitLab",
+      canPickMany: true,
+    });
+
+    if (!selectedItems || selectedItems.length === 0) {
       return;
     }
 
-    const commandsToUpload = selectedCommands.map((item) => item.command);
+    // Filter out separator items and only keep actual command items
+    const commandsToUpload = selectedItems
+      .filter((item) => !item.isSeparator && item.command)
+      .map((item) => item.command!);
+
+    if (commandsToUpload.length === 0) {
+      vscode.window.showInformationMessage("No commands selected");
+      return;
+    }
+
     const categories = [
       ...new Set(commandsToUpload.map((cmd) => cmd.category)),
     ];
+
+    // Confirm upload
+    const confirmMessage = `Confirm upload ${commandsToUpload.length} commands?`;
+    const confirmResult = await vscode.window.showInformationMessage(
+      confirmMessage,
+      { modal: true },
+      "Confirm Upload"
+    );
+
+    if (confirmResult !== "Confirm Upload") {
+      return;
+    }
 
     vscode.window.withProgress(
       {
