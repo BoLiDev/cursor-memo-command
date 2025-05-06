@@ -202,7 +202,14 @@
           "group": "inline"
         }
       ],
-      "view/title": [],
+      "view/title": [
+        {
+          "command": "cursor-memo.searchAllPrompts",
+          "when": "view == cursorMemoPanel",
+          "group": "navigation@2",
+          "icon": "$(search)"
+        }
+      ],
       "commandPalette": [
         {
           "command": "cursor-memo.savePrompt",

@@ -388,12 +388,43 @@ export class VSCodeUserInteractionService {
     await vscode.commands.executeCommand("composer.startComposerPrompt");
   }
 
+  /**
+   * Writes text to the cursor chat using a series of hacks
+   * @param text The text to write
+   */
   async writeCursorChat(text: string): Promise<void> {
+    let focusShifted = false;
+    // Attempt to focus the active editor group first.
+    if (vscode.window.activeTextEditor) {
+      try {
+        await vscode.commands.executeCommand(
+          "workbench.action.focusActiveEditorGroup"
+        );
+        focusShifted = true;
+      } catch {
+        // Do nothing
+      }
+    } else {
+      // If no active editor, try to focus the primary sidebar as a fallback.
+      try {
+        await vscode.commands.executeCommand("workbench.action.focusSideBar");
+        focusShifted = true;
+      } catch {
+        // Do nothing
+      }
+    }
+
+    // If we attempted to shift focus, add a brief delay.
+    if (focusShifted) {
+      // A brief delay to allow focus to shift before opening the chat.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
     await this.writeClipboard(text);
     await this.openCursorChat();
 
     setTimeout(async () => {
       await this.pasteClipboard();
-    }, 100);
+    }, 100); // This delay seems to be generally effective for pasting.
   }
 }
