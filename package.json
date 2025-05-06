@@ -2,7 +2,7 @@
   "name": "cursor-memo-plugin",
   "displayName": "Cursor Memo Plugin",
   "description": "Plugin to save and reuse Cursor chat commands",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "Boruto",
   "repository": {
     "type": "git",
