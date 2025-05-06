@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import fetch, { Response } from "node-fetch";
 import * as os from "os";
 import { z } from "zod";
-import { MemoItemSchema, GitLabFileContentSchema } from "../zod/gitlab";
+import { GitLabFileContentSchema, GitLabDataSchema } from "../zod/gitlab";
 import {
   GitLabBranchResponseSchema,
   GitLabMergeRequestResponseSchema,
@@ -12,12 +12,12 @@ import {
 } from "../zod/gitlab-mr";
 import { MemoItem } from "../models/memo-item";
 import { LocalMemoService } from "./local-data-service";
-
-// Schema for the structure inside the decoded GitLab file content
-const teamCommandsSchema = z.object({
-  commands: z.array(MemoItemSchema),
-  categories: z.array(z.string()).optional(),
-});
+import {
+  fromMemoItems,
+  parseCommands,
+  serializeCommands,
+  toMemoItems,
+} from "../zod/command-schema";
 
 /**
  * Service for interacting with GitLab API, including fetching and managing cloud commands.
@@ -27,6 +27,8 @@ export class GitlabClient {
   private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
   private static DEFAULT_CATEGORY = "Default";
+  // 是否使用新的人类友好格式存储到GitLab
+  private static USE_NEW_FORMAT = true;
 
   private domain: string;
   private projectId: string;
@@ -161,12 +163,11 @@ export class GitlabClient {
 
   /**
    * Fetches, decodes, parses, and validates team commands from GitLab file content.
-   * Calls getFileContent and then processes the result.
-   * @returns Promise with parsed command data (commands and categories) or an error.
+   * @returns Promise with parsed command data or an error.
    */
   public async fetchTeamCommands(): Promise<{
     success: boolean;
-    data?: z.infer<typeof teamCommandsSchema>;
+    data?: { commands: MemoItem[]; categories: string[] };
     error?: string;
   }> {
     let token: string | undefined;
@@ -187,36 +188,33 @@ export class GitlabClient {
           error: "File content is empty or missing in GitLab response.",
         };
       }
+
       const decodedContent = Buffer.from(fileData.content, "base64").toString(
         "utf-8"
       );
 
-      let jsonData: any;
       try {
-        jsonData = JSON.parse(decodedContent);
+        // 解析新格式数据
+        const commandsData = parseCommands(decodedContent);
+
+        // 转换为内部格式
+        const commands = toMemoItems(commandsData);
+        const categories = Object.keys(commandsData);
+
+        return {
+          success: true,
+          data: {
+            commands,
+            categories,
+          },
+        };
       } catch (parseError: any) {
-        console.error("Failed to parse decoded JSON content:", parseError);
+        console.error("Failed to parse command data:", parseError);
         return {
           success: false,
-          error: `Invalid JSON content in GitLab file: ${parseError.message}`,
+          error: `Invalid command data: ${parseError.message}`,
         };
       }
-
-      const validationResult = teamCommandsSchema.safeParse(jsonData);
-      if (!validationResult.success) {
-        console.error(
-          "Team commands schema validation failed:",
-          validationResult.error.errors
-        );
-        return {
-          success: false,
-          error: `Invalid command data format: ${validationResult.error.errors
-            .map((e) => `${e.path.join(".")}: ${e.message}`)
-            .join(", ")}`,
-        };
-      }
-
-      return { success: true, data: validationResult.data };
     } catch (error: any) {
       console.error("Failed to fetch team commands from GitLab:", error);
       let userMessage =
@@ -255,24 +253,11 @@ export class GitlabClient {
       };
     }
 
-    const importedCommands: MemoItem[] = fetchResult.data.commands || [];
-    const now = Date.now();
-
-    this.cloudCommands = importedCommands.map((cmd) => {
-      const label =
-        cmd.label ||
-        (cmd.command.length > 30
-          ? `${cmd.command.slice(0, 30)}...`
-          : cmd.command);
-      return {
-        ...cmd,
-        id: `cloud_${cmd.id || now.toString()}_${Math.random()}`,
-        label: label,
-        timestamp: cmd.timestamp || now,
-        category: cmd.category || GitlabClient.DEFAULT_CATEGORY,
-        isCloud: true,
-      };
-    });
+    // 使用转换后的 MemoItem[]
+    this.cloudCommands = fetchResult.data.commands.map((cmd) => ({
+      ...cmd,
+      isCloud: true,
+    }));
 
     await this.saveCloudCommands();
 
@@ -300,30 +285,18 @@ export class GitlabClient {
       };
     }
 
+    // 使用转换后的 MemoItem[]
     const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
-    const now = Date.now();
 
     const filteredCommands = allImportedCommands.filter((cmd) =>
       selectedCategories.includes(cmd.category || GitlabClient.DEFAULT_CATEGORY)
     );
 
-    const newCloudCommands = filteredCommands.map((cmd) => {
-      const label =
-        cmd.label ||
-        (cmd.command.length > 30
-          ? `${cmd.command.slice(0, 30)}...`
-          : cmd.command);
-      return {
-        ...cmd,
-        id: `cloud_${cmd.id || now.toString()}_${Math.random()}`,
-        label: label,
-        timestamp: cmd.timestamp || now,
-        category: cmd.category || GitlabClient.DEFAULT_CATEGORY,
-        isCloud: true,
-      };
-    });
+    this.cloudCommands = filteredCommands.map((cmd) => ({
+      ...cmd,
+      isCloud: true,
+    }));
 
-    this.cloudCommands = newCloudCommands;
     await this.saveCloudCommands();
 
     return {
@@ -344,24 +317,8 @@ export class GitlabClient {
       );
     }
 
-    // Get categories explicitly defined in the file
-    const explicitCategories = fetchResult.data.categories || [];
-
-    // Also collect all categories used in individual commands
-    const commandCategories = new Set<string>();
-    const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
-
-    allImportedCommands.forEach((cmd) => {
-      const category = cmd.category || GitlabClient.DEFAULT_CATEGORY;
-      commandCategories.add(category);
-    });
-
-    // Combine both sources of categories
-    const allCategories = [
-      ...new Set([...explicitCategories, ...commandCategories]),
-    ];
-
-    return allCategories;
+    // 直接返回 fetchResult 中解析出的 categories
+    return fetchResult.data.categories || [];
   }
 
   /**
@@ -685,49 +642,29 @@ export class GitlabClient {
         };
       }
 
-      const remoteCommands = fetchResult.data?.commands || [];
-      const remoteCategories = fetchResult.data?.categories || [];
+      // 获取所有远程和本地命令合并后的结果
+      const allCommands = [...(fetchResult.data?.commands || []), ...commands];
 
-      const mergedCommands = [...remoteCommands];
-      const mergedCategories = new Set(remoteCategories);
+      // 确保每个命令都有 alias
+      const processedCommands = allCommands.map((cmd) => ({
+        ...cmd,
+        alias: cmd.alias || cmd.label,
+      }));
 
-      let newCommandsCount = 0;
+      // 移除重复项（基于 id 或 alias+category 组合）
+      const uniqueCommands = removeDuplicateCommands(processedCommands);
 
-      for (const localCommand of commands) {
-        const commandToAdd = {
-          id: localCommand.id.includes("_imported_")
-            ? localCommand.id.split("_imported_")[0]
-            : localCommand.id,
-          label: localCommand.label,
-          command: localCommand.command,
-          timestamp: localCommand.timestamp,
-          category: localCommand.category,
-          alias: localCommand.alias,
-        };
+      // 计算新增的命令数量
+      const newCommandsCount =
+        uniqueCommands.length - (fetchResult.data?.commands.length || 0);
 
-        const existingIndex = mergedCommands.findIndex(
-          (cmd) => cmd.id === commandToAdd.id
-        );
+      // 转换为新的数据格式
+      const commandsData = fromMemoItems(uniqueCommands);
 
-        if (existingIndex >= 0) {
-          mergedCommands[existingIndex] = commandToAdd;
-        } else {
-          mergedCommands.push(commandToAdd);
-          newCommandsCount++;
-        }
+      // 序列化为 JSON 字符串
+      const newFileContent = serializeCommands(commandsData);
 
-        mergedCategories.add(localCommand.category);
-      }
-
-      const newFileContent = JSON.stringify(
-        {
-          commands: mergedCommands,
-          categories: Array.from(mergedCategories),
-        },
-        null,
-        2
-      );
-
+      // 创建分支
       const timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
       const branchName = `cursor_memo_update_${timestamp}`;
 
@@ -740,6 +677,7 @@ export class GitlabClient {
         };
       }
 
+      // 提交文件
       const commitResult = await this.commitFileChange(
         token,
         branchName,
@@ -756,6 +694,7 @@ export class GitlabClient {
         };
       }
 
+      // 创建合并请求
       const mrResult = await this.createMergeRequest(
         token,
         branchName,
@@ -873,4 +812,46 @@ async function handleGitLabError(response: Response): Promise<void> {
       `GitLab API error: ${response.status} ${response.statusText}. Details: ${errorBody}`
     );
   }
+}
+
+/**
+ * 根据 id 或 alias+category 组合去除重复的命令
+ */
+function removeDuplicateCommands(commands: MemoItem[]): MemoItem[] {
+  const idMap = new Map<string, MemoItem>();
+  const aliasMap = new Map<string, MemoItem>();
+
+  // 优先保留本地命令，覆盖云端命令
+  commands.sort((a, b) => {
+    if (a.isCloud && !b.isCloud) return -1;
+    if (!a.isCloud && b.isCloud) return 1;
+    return 0;
+  });
+
+  commands.forEach((cmd) => {
+    // 如果有 ID，用 ID 作为唯一键
+    if (cmd.id) {
+      idMap.set(cmd.id, cmd);
+    }
+
+    // 同时用 alias+category 作为唯一键
+    if (cmd.alias) {
+      const key = `${cmd.category}:${cmd.alias}`;
+      aliasMap.set(key, cmd);
+    }
+  });
+
+  // 合并两个 Map 的值
+  const resultMap = new Map<string, MemoItem>();
+  idMap.forEach((cmd) => {
+    resultMap.set(cmd.id, cmd);
+  });
+
+  aliasMap.forEach((cmd, key) => {
+    if (!resultMap.has(cmd.id)) {
+      resultMap.set(cmd.id, cmd);
+    }
+  });
+
+  return Array.from(resultMap.values());
 }

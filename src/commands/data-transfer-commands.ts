@@ -5,6 +5,7 @@ import * as fs from "fs";
 import { LocalMemoService } from "../services/local-data-service";
 import { MemoTreeDataProvider } from "../view/tree-provider";
 import { DataTransferService } from "../services/data-transfer-service";
+import { parseCommands } from "../zod/command-schema";
 
 /**
  * Creates the export commands handler
@@ -91,81 +92,49 @@ export function createImportCommandsHandler(
         const fileContents = fs.readFileSync(uris[0].fsPath, "utf8");
 
         try {
-          // Parse categories from the imported file to allow user selection
-          const importData = JSON.parse(fileContents);
-          const availableCategories = new Set<string>();
-          const defaultCategory = dataService.getDefaultCategory();
+          // 使用新的解析方式
+          const commandsData = parseCommands(fileContents);
 
-          if (importData.commands && Array.isArray(importData.commands)) {
-            importData.commands.forEach((cmd: any) => {
-              const category = cmd.category || defaultCategory;
-              availableCategories.add(category);
-            });
-          }
+          // 从解析后的数据中获取分类
+          const availableCategories = Object.keys(commandsData);
 
-          const categories = Array.from(availableCategories);
-
-          if (categories.length === 0 && importData.commands?.length > 0) {
-            await importAllData(
-              fileContents,
-              dataTransferService,
-              memoTreeProvider
-            );
-            return;
-          } else if (categories.length === 0) {
+          if (availableCategories.length === 0) {
             vscode.window.showInformationMessage(
-              "No categories or commands found in the file to import."
+              "No commands found in the file to import."
             );
             return;
           }
 
-          // Provide options to import selected categories or all
-          const options = categories;
-
-          const selectedOption = await vscode.window.showQuickPick(options, {
-            placeHolder: "Select categories to import",
-            canPickMany: true,
-          });
+          // 提供选项来导入选定的分类
+          const selectedOption = await vscode.window.showQuickPick(
+            availableCategories,
+            {
+              placeHolder: "Select categories to import",
+              canPickMany: true,
+            }
+          );
 
           if (!selectedOption || selectedOption.length === 0) {
             return;
           }
 
-          // Import only selected categories
+          // 导入选定的分类
           await importSelectedData(
-            fileContents,
+            fileContents, // 仍然传递原始 JSON 字符串
             selectedOption,
             dataTransferService,
             memoTreeProvider
           );
         } catch (parseError) {
-          vscode.window.showErrorMessage(`Invalid JSON file: ${parseError}`);
+          vscode.window.showErrorMessage(
+            `Invalid command data format: ${parseError}`
+          );
         }
       } catch (error) {
         vscode.window.showErrorMessage(`Error reading file: ${error}`);
       }
     }
   };
-}
-
-/**
- * Helper function to import all data
- */
-async function importAllData(
-  jsonData: string,
-  dataTransferService: DataTransferService,
-  memoTreeProvider: MemoTreeDataProvider
-): Promise<void> {
-  const result = await dataTransferService.importData(jsonData);
-
-  if (result.success) {
-    memoTreeProvider.updateView();
-    vscode.window.showInformationMessage(
-      `Imported ${result.importedCommands} commands and ${result.importedCategories} categories`
-    );
-  } else {
-    vscode.window.showErrorMessage("Failed to import commands");
-  }
 }
 
 /**

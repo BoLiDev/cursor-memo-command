@@ -2,6 +2,14 @@
 
 import { MemoItem } from "../models/memo-item";
 import { LocalMemoService } from "./local-data-service";
+import {
+  CommandsStructureSchema,
+  fromMemoItems,
+  parseCommands,
+  serializeCommands,
+  toMemoItems,
+} from "../zod/command-schema";
+import { z } from "zod";
 
 /**
  * Service for handling data import and export operations for LOCAL data.
@@ -10,18 +18,17 @@ export class DataTransferService {
   constructor(private dataService: LocalMemoService) {}
 
   /**
-   * Export all data as JSON string
-   * @returns JSON string of all commands and categories
+   * Export all data as JSON string using the human-friendly format
+   * @returns JSON string of all commands organized by category and alias
    */
   public exportData(): string {
-    return JSON.stringify({
-      commands: this.dataService.getCommands(),
-      categories: this.dataService.getCategories(),
-    });
+    const commands = this.dataService.getCommands();
+    const commandsData = fromMemoItems(commands);
+    return serializeCommands(commandsData);
   }
 
   /**
-   * Export selected categories as JSON string
+   * Export selected categories as JSON string using the human-friendly format
    * @param selectedCategories Array of category names to export
    * @returns JSON string of selected categories and their commands
    */
@@ -30,15 +37,13 @@ export class DataTransferService {
       .getCommands()
       .filter((cmd) => selectedCategories.includes(cmd.category));
 
-    return JSON.stringify({
-      commands: filteredCommands,
-      categories: selectedCategories,
-    });
+    const commandsData = fromMemoItems(filteredCommands);
+    return serializeCommands(commandsData);
   }
 
   /**
    * Import data from JSON string
-   * @param jsonData JSON string of commands and categories
+   * @param jsonData JSON string of commands data in the new format
    * @returns Promise with result of import operation
    */
   public async importData(jsonData: string): Promise<{
@@ -47,60 +52,33 @@ export class DataTransferService {
     importedCategories: number;
   }> {
     try {
-      const data = JSON.parse(jsonData);
-      const importedCommands: MemoItem[] = data.commands || [];
-      const importedCategories: string[] = data.categories || [];
+      // 解析数据
+      const commandsData = parseCommands(jsonData);
 
-      // Validate imported data
-      const validCommands = importedCommands.filter(
-        (cmd) =>
-          typeof cmd === "object" &&
-          cmd !== null &&
-          typeof cmd.command === "string" &&
-          typeof cmd.id === "string"
-      );
+      // 获取分类
+      const categories = Object.keys(commandsData);
 
-      // Process categories
+      // 转换为内部格式
+      const commands = toMemoItems(commandsData);
+
+      // 处理分类
       const currentCategories = this.dataService.getCategories();
-      const newCategories = importedCategories.filter(
-        (cat) =>
-          typeof cat === "string" &&
-          cat.trim() !== "" &&
-          !currentCategories.includes(cat)
+      const newCategories = categories.filter(
+        (cat) => cat.trim() !== "" && !currentCategories.includes(cat)
       );
 
       if (newCategories.length > 0) {
-        await this.dataService.addCategories(newCategories); // Use the bulk method
+        await this.dataService.addCategories(newCategories);
       }
 
-      // Process commands with proper IDs
-      const now = Date.now();
-      const processedCommands = validCommands.map((cmd) => {
-        const label =
-          cmd.label ||
-          (cmd.command.length > 30
-            ? `${cmd.command.slice(0, 30)}...`
-            : cmd.command);
-        const category = this.dataService.getCategories().includes(cmd.category)
-          ? cmd.category
-          : this.dataService.getDefaultCategory();
-
-        return {
-          ...cmd,
-          id: `${cmd.id}_imported_${now}`,
-          label: label,
-          timestamp: cmd.timestamp || now,
-          category: category,
-        };
-      });
-
-      if (processedCommands.length > 0) {
-        await this.dataService.addCommands(processedCommands); // Use the bulk method
+      // 处理命令
+      if (commands.length > 0) {
+        await this.dataService.addCommands(commands);
       }
 
       return {
         success: true,
-        importedCommands: processedCommands.length,
+        importedCommands: commands.length,
         importedCategories: newCategories.length,
       };
     } catch (error) {
@@ -115,7 +93,7 @@ export class DataTransferService {
 
   /**
    * Import selected categories from JSON string
-   * @param jsonData JSON string of commands and categories
+   * @param jsonData JSON string of commands data in the new format
    * @param selectedCategories Array of category names to import
    * @returns Promise with result of import operation
    */
@@ -128,72 +106,41 @@ export class DataTransferService {
     importedCategories: number;
   }> {
     try {
-      const data = JSON.parse(jsonData);
-      const allImportedCommands: MemoItem[] = data.commands || [];
-      const allImportedCategories: string[] = data.categories || [];
+      // 解析数据
+      const allCommandsData = parseCommands(jsonData);
 
-      // Filter commands by selected categories
-      const importedCommands = allImportedCommands.filter((cmd) =>
-        selectedCategories.includes(
-          cmd.category || this.dataService.getDefaultCategory()
-        )
-      );
+      // 过滤出选中的分类
+      const filteredData: z.infer<typeof CommandsStructureSchema> = {};
+      Object.keys(allCommandsData)
+        .filter((category) => selectedCategories.includes(category))
+        .forEach((category) => {
+          filteredData[category] = allCommandsData[category];
+        });
 
-      // Filter categories to only include selected ones that exist in the import data
-      const importedCategories = allImportedCategories.filter((cat) =>
-        selectedCategories.includes(cat)
-      );
+      // 获取分类
+      const categories = Object.keys(filteredData);
 
-      // Validate imported data
-      const validCommands = importedCommands.filter(
-        (cmd) =>
-          typeof cmd === "object" &&
-          cmd !== null &&
-          typeof cmd.command === "string" &&
-          typeof cmd.id === "string"
-      );
+      // 转换为内部格式
+      const commands = toMemoItems(filteredData);
 
-      // Process categories
+      // 处理分类
       const currentCategories = this.dataService.getCategories();
-      const newCategories = importedCategories.filter(
-        (cat) =>
-          typeof cat === "string" &&
-          cat.trim() !== "" &&
-          !currentCategories.includes(cat)
+      const newCategories = categories.filter(
+        (cat) => cat.trim() !== "" && !currentCategories.includes(cat)
       );
 
       if (newCategories.length > 0) {
-        await this.dataService.addCategories(newCategories); // Use the bulk method
+        await this.dataService.addCategories(newCategories);
       }
 
-      // Process commands with proper IDs
-      const now = Date.now();
-      const processedCommands = validCommands.map((cmd) => {
-        const label =
-          cmd.label ||
-          (cmd.command.length > 30
-            ? `${cmd.command.slice(0, 30)}...`
-            : cmd.command);
-        const category = this.dataService.getCategories().includes(cmd.category)
-          ? cmd.category
-          : this.dataService.getDefaultCategory();
-
-        return {
-          ...cmd,
-          id: `${cmd.id}_imported_${now}`,
-          label: label,
-          timestamp: cmd.timestamp || now,
-          category: category,
-        };
-      });
-
-      if (processedCommands.length > 0) {
-        await this.dataService.addCommands(processedCommands); // Use the bulk method
+      // 处理命令
+      if (commands.length > 0) {
+        await this.dataService.addCommands(commands);
       }
 
       return {
         success: true,
-        importedCommands: processedCommands.length,
+        importedCommands: commands.length,
         importedCategories: newCategories.length,
       };
     } catch (error) {
