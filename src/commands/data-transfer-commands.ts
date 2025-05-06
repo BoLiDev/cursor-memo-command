@@ -26,20 +26,29 @@ export function createExportCommandsHandler(
     }
 
     // Provide options to export selected categories or all
-    const options = categories;
+    const options: vscode.QuickPickItem[] = categories.map((cat) => ({
+      label: cat.name,
+      description:
+        cat.id === dataService.getDefaultCategoryId() ? "(Default)" : "",
+    }));
 
-    const selectedOption = await vscode.window.showQuickPick(options, {
+    const selectedQuickPickItems = await vscode.window.showQuickPick(options, {
       placeHolder: "Select categories to export",
       canPickMany: true,
     });
 
-    if (!selectedOption || selectedOption.length === 0) {
+    if (!selectedQuickPickItems || selectedQuickPickItems.length === 0) {
       return;
     }
 
+    const selectedCategoryIds = selectedQuickPickItems.map(
+      (item) => item.label
+    );
+
     let exportData: string;
     // Export only selected categories
-    exportData = dataTransferService.exportSelectedCategories(selectedOption);
+    exportData =
+      dataTransferService.exportSelectedCategories(selectedCategoryIds);
 
     const saveDialogOptions: vscode.SaveDialogOptions = {
       defaultUri: vscode.Uri.file("cursor_commands.json"),

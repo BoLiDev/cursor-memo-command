@@ -1,6 +1,8 @@
 /** @format */
 
 import { z } from "zod";
+import { MemoItem } from "../models/memo-item"; // Import MemoItem
+import { Category } from "../models/category"; // Import Category
 
 // 单个命令内容的 schema
 export const CommandContentSchema = z.object({
@@ -60,29 +62,17 @@ export function parseCommands(
 // 为了兼容内部模型，需要将命令数据转换为 MemoItem 数组
 export function toMemoItems(
   commandData: z.infer<typeof CommandsStructureSchema>
-): Array<{
-  id: string;
-  label: string;
-  command: string;
-  timestamp: number;
-  alias: string;
-  category: string;
-}> {
+): Omit<MemoItem, "isCloud">[] {
   const now = Date.now();
-  const items: Array<{
-    id: string;
-    label: string;
-    command: string;
-    timestamp: number;
-    alias: string;
-    category: string;
-  }> = [];
+  const items: Omit<MemoItem, "isCloud">[] = [];
 
-  Object.entries(commandData).forEach(([category, commands]) => {
+  Object.entries(commandData).forEach(([categoryName, commands]) => {
     Object.entries(commands).forEach(([alias, commandObj]) => {
       const command = commandObj.content;
       const label =
         command.length > 30 ? `${command.slice(0, 30)}...` : command;
+
+      const categoryId = categoryName;
 
       items.push({
         id: `cmd_${now}_${Math.random().toString().slice(2)}`,
@@ -90,7 +80,7 @@ export function toMemoItems(
         command,
         timestamp: now,
         alias,
-        category,
+        categoryId: categoryId,
       });
     });
   });
@@ -100,24 +90,21 @@ export function toMemoItems(
 
 // 从 MemoItem 数组转换为命令数据结构
 export function fromMemoItems(
-  items: Array<{
-    command: string;
-    category: string;
-    alias?: string;
-    label?: string;
-  }>
+  items: MemoItem[],
+  categories?: Category[]
 ): z.infer<typeof CommandsStructureSchema> {
   const result: z.infer<typeof CommandsStructureSchema> = {};
+  const categoryMap = new Map(categories?.map((cat) => [cat.id, cat.name]));
 
   items.forEach((item) => {
-    const category = item.category;
+    const categoryName = categoryMap?.get(item.categoryId) ?? item.categoryId;
     const alias = item.alias || item.label || "未命名命令";
 
-    if (!result[category]) {
-      result[category] = {};
+    if (!result[categoryName]) {
+      result[categoryName] = {};
     }
 
-    result[category][alias] = {
+    result[categoryName][alias] = {
       content: item.command,
     };
   });

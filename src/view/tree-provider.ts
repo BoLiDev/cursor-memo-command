@@ -148,8 +148,8 @@ export class MemoTreeDataProvider
     if (element instanceof CategoryTreeItem) {
       // --- Third Level: Return MemoItems under a specific category ---
       return element.isCloud
-        ? this.viewModel.getCloudCategoryItems(element.label)
-        : this.viewModel.getLocalCategoryItems(element.label);
+        ? this.viewModel.getCloudCategoryItems(element.category.id)
+        : this.viewModel.getLocalCategoryItems(element.category.id);
     }
 
     // MemoItems have no children

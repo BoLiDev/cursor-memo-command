@@ -37,10 +37,10 @@ export function createPushToGitLabHandler(
     // Create a mapping of category to commands for display
     const commandsByCategory: { [category: string]: MemoItem[] } = {};
     localCommands.forEach((cmd) => {
-      if (!commandsByCategory[cmd.category]) {
-        commandsByCategory[cmd.category] = [];
+      if (!commandsByCategory[cmd.categoryId]) {
+        commandsByCategory[cmd.categoryId] = [];
       }
-      commandsByCategory[cmd.category].push(cmd);
+      commandsByCategory[cmd.categoryId].push(cmd);
     });
 
     // Sort categories for display
@@ -58,7 +58,7 @@ export function createPushToGitLabHandler(
       commandsByCategory[category].forEach((cmd) => {
         quickPickItems.push({
           label: `$(terminal) ${cmd.alias || cmd.label}`,
-          description: cmd.category,
+          description: cmd.categoryId,
           detail:
             cmd.command.length > 60
               ? `${cmd.command.substring(0, 60)}...`
@@ -88,7 +88,7 @@ export function createPushToGitLabHandler(
     }
 
     const categories = [
-      ...new Set(commandsToUpload.map((cmd) => cmd.category)),
+      ...new Set(commandsToUpload.map((cmd) => cmd.categoryId)),
     ];
 
     // Confirm upload

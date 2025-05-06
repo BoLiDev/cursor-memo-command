@@ -6,6 +6,7 @@ import { MemoTreeDataProvider } from "../view/tree-provider";
 import { CategoryTreeItem } from "../view/tree-items";
 import { MemoItem } from "../models/memo-item";
 import { createMultilineInputBox } from "../utils";
+import { Category } from "../models/category";
 
 /**
  * Creates the add category command handler
@@ -50,13 +51,13 @@ export function createRenameCategoryHandler(
   dataService: LocalMemoService,
   memoTreeProvider: MemoTreeDataProvider
 ): (...args: any[]) => Promise<void> {
-  return async (categoryItem: CategoryTreeItem) => {
-    if (!categoryItem) return;
+  return async (categoryTreeItem: CategoryTreeItem) => {
+    if (!categoryTreeItem) return;
 
-    const oldCategoryName = categoryItem.label;
-    const defaultCategory = dataService.getDefaultCategory();
+    const categoryToRename = categoryTreeItem.category;
+    const defaultCategoryId = dataService.getDefaultCategoryId();
 
-    if (oldCategoryName === defaultCategory) {
+    if (categoryToRename.id === defaultCategoryId) {
       vscode.window.showInformationMessage(
         `Cannot rename the default category`
       );
@@ -66,16 +67,16 @@ export function createRenameCategoryHandler(
     const newCategoryName = await vscode.window.showInputBox({
       placeHolder: "Enter new category name",
       prompt: "Please enter the new name for the category",
-      value: oldCategoryName,
+      value: categoryToRename.name,
     });
 
     if (
       newCategoryName &&
       newCategoryName.trim() &&
-      newCategoryName !== oldCategoryName
+      newCategoryName !== categoryToRename.name
     ) {
       const success = await dataService.renameCategory(
-        oldCategoryName,
+        categoryToRename.id,
         newCategoryName.trim()
       );
 
@@ -116,8 +117,7 @@ export function createDeleteCategoryHandler(
       return;
     }
 
-    // Directly delete category without confirmation
-    const result = await dataService.deleteCategory(categoryName);
+    const result = await dataService.deleteCategory(categoryItem.category.id);
 
     if (result.success) {
       memoTreeProvider.updateView();
@@ -141,38 +141,44 @@ export function createMoveToCategoryHandler(
   return async (item: MemoItem) => {
     if (!item) return;
 
-    const categories = dataService.getCategories();
-    const currentCategory = item.category;
+    const allCategories = dataService.getCategories();
+    const currentCategoryId = item.categoryId;
 
-    // Filter out the current category from options
-    const categoriesWithoutCurrent = categories.filter(
-      (cat) => cat !== currentCategory
+    const availableCategories = allCategories.filter(
+      (cat) => cat.id !== currentCategoryId
     );
 
-    if (categoriesWithoutCurrent.length === 0) {
+    if (availableCategories.length === 0) {
       vscode.window.showInformationMessage(
         "No other categories available to move to"
       );
       return;
     }
 
-    const selectedCategory = await vscode.window.showQuickPick(
-      categoriesWithoutCurrent,
+    const selectedCategoryItem = await vscode.window.showQuickPick<
+      vscode.QuickPickItem & { category: Category }
+    >(
+      availableCategories.map((cat) => ({
+        label: cat.name,
+        description:
+          cat.id === dataService.getDefaultCategoryId() ? "(Default)" : "",
+        category: cat,
+      })),
       {
         placeHolder: "Select a category to move this command to",
       }
     );
 
-    if (selectedCategory) {
+    if (selectedCategoryItem) {
       const success = await dataService.moveCommandToCategory(
         item.id,
-        selectedCategory
+        selectedCategoryItem.category.id
       );
 
       if (success) {
         memoTreeProvider.updateView();
         vscode.window.showInformationMessage(
-          `Command moved to "${selectedCategory}"`
+          `Command moved to "${selectedCategoryItem.category.name}"`
         );
       }
     }
@@ -208,7 +214,7 @@ export function createAddCommandToCategoryHandler(
     );
 
     if (commandText) {
-      await dataService.addCommand(commandText, categoryName);
+      await dataService.addCommand(commandText, categoryItem.category.id);
       memoTreeProvider.updateView();
       vscode.window.showInformationMessage(
         `Command added to "${categoryName}"`

@@ -1,6 +1,7 @@
 /** @format */
 
 import { MemoItem } from "../models/memo-item";
+import { Category } from "../models/category";
 import { StorageService } from "./storage-service";
 
 /**
@@ -12,7 +13,7 @@ export class LocalMemoService {
   private static DEFAULT_CATEGORY = "Default";
 
   private commands: MemoItem[] = [];
-  private categories: string[] = [];
+  private categories: Category[] = [];
   private initialized: boolean = false;
 
   /**
@@ -38,8 +39,11 @@ export class LocalMemoService {
     );
 
     this.commands = storedCommands.map((cmd) => {
-      if (!cmd.category) {
-        return { ...cmd, category: LocalMemoService.DEFAULT_CATEGORY };
+      if (!cmd.categoryId) {
+        console.warn(
+          `Command ${cmd.id} missing categoryId, assigning to Default.`
+        );
+        return { ...cmd, categoryId: LocalMemoService.DEFAULT_CATEGORY };
       }
       return cmd;
     });
@@ -48,13 +52,21 @@ export class LocalMemoService {
       await this.saveCommands();
     }
 
-    this.categories = this.storageService.getValue<string[]>(
+    const storedCategories = this.storageService.getValue<Category[]>(
       LocalMemoService.CATEGORIES_KEY,
       []
     );
+    this.categories = storedCategories;
 
-    if (!this.categories.includes(LocalMemoService.DEFAULT_CATEGORY)) {
-      this.categories.push(LocalMemoService.DEFAULT_CATEGORY);
+    if (
+      !this.categories.some(
+        (cat) => cat.id === LocalMemoService.DEFAULT_CATEGORY
+      )
+    ) {
+      this.categories.push({
+        id: LocalMemoService.DEFAULT_CATEGORY,
+        name: LocalMemoService.DEFAULT_CATEGORY,
+      });
       await this.saveCategories();
     }
 
@@ -75,35 +87,51 @@ export class LocalMemoService {
    * Returns a copy of the categories array
    * @returns Array of all local categories
    */
-  public getCategories(): string[] {
+  public getCategories(): Category[] {
     return [...this.categories];
   }
 
   /**
    * Get the default category name
    * @returns The name of the default category
+   * @deprecated Prefer getDefaultCategoryId
    */
   public getDefaultCategory(): string {
     return LocalMemoService.DEFAULT_CATEGORY;
   }
 
   /**
+   * Get the ID of the default category
+   * @returns The ID of the default category
+   */
+  public getDefaultCategoryId(): string {
+    return LocalMemoService.DEFAULT_CATEGORY;
+  }
+
+  /**
    * Add a new local command
    * @param command The command content
-   * @param category The category the command belongs to, defaults to the default category
+   * @param categoryId The ID of the category the command belongs to, defaults to the default category ID
    * @returns Promise containing the newly added command item
    */
   public async addCommand(
     command: string,
-    category: string = LocalMemoService.DEFAULT_CATEGORY
+    categoryId: string = this.getDefaultCategoryId()
   ): Promise<MemoItem> {
+    if (!this.categories.some((cat) => cat.id === categoryId)) {
+      console.warn(
+        `Attempted to add command to non-existent category ID: ${categoryId}. Assigning to Default.`
+      );
+      categoryId = this.getDefaultCategoryId();
+    }
+
     const newItem: MemoItem = {
       id: Date.now().toString(),
       label: command.length > 30 ? `${command.slice(0, 30)}...` : command,
       command: command,
       timestamp: Date.now(),
-      category: category,
-      isCloud: false, // Explicitly mark as local
+      categoryId: categoryId,
+      isCloud: false,
     };
 
     this.commands = [...this.commands, newItem];
@@ -119,6 +147,9 @@ export class LocalMemoService {
   public async addCommands(newCommands: MemoItem[]): Promise<void> {
     const localNewCommands = newCommands.map((cmd) => ({
       ...cmd,
+      categoryId: this.categories.some((cat) => cat.id === cmd.categoryId)
+        ? cmd.categoryId
+        : this.getDefaultCategoryId(),
       isCloud: false,
     }));
     this.commands = [...this.commands, ...localNewCommands];
@@ -203,11 +234,12 @@ export class LocalMemoService {
    */
   public async addCategory(categoryName: string): Promise<boolean> {
     const trimmedName = categoryName?.trim();
-    if (!trimmedName || this.categories.includes(trimmedName)) {
+    if (!trimmedName || this.categories.some((cat) => cat.id === trimmedName)) {
       return false;
     }
 
-    this.categories.push(trimmedName);
+    const newCategory: Category = { id: trimmedName, name: trimmedName };
+    this.categories.push(newCategory);
     await this.saveCategories();
     return true;
   }
@@ -220,7 +252,11 @@ export class LocalMemoService {
   public async addCategories(categoryNames: string[]): Promise<boolean> {
     const uniqueNewCategories = categoryNames
       .map((cat) => cat?.trim())
-      .filter((cat) => cat && !this.categories.includes(cat));
+      .filter(
+        (catName) =>
+          catName && !this.categories.some((cat) => cat.id === catName)
+      )
+      .map((catName) => ({ id: catName, name: catName }) as Category);
 
     if (uniqueNewCategories.length > 0) {
       this.categories.push(...uniqueNewCategories);
@@ -233,31 +269,32 @@ export class LocalMemoService {
   /**
    * Delete a local category
    * Moves all commands in this category to the default category
-   * @param categoryName The name of the category to delete
+   * @param categoryId The ID of the category to delete
    * @returns Promise containing the operation result and number of moved commands
    */
   public async deleteCategory(
-    categoryName: string
+    categoryId: string
   ): Promise<{ success: boolean; commandsMoved: number }> {
     if (
-      !categoryName ||
-      categoryName === LocalMemoService.DEFAULT_CATEGORY ||
-      !this.categories.includes(categoryName)
+      !categoryId ||
+      categoryId === this.getDefaultCategoryId() ||
+      !this.categories.some((cat) => cat.id === categoryId)
     ) {
       return { success: false, commandsMoved: 0 };
     }
 
     let commandsMoved = 0;
+    const defaultCategoryId = this.getDefaultCategoryId();
 
     this.commands = this.commands.map((cmd) => {
-      if (cmd.category === categoryName) {
+      if (cmd.categoryId === categoryId) {
         commandsMoved++;
-        return { ...cmd, category: LocalMemoService.DEFAULT_CATEGORY };
+        return { ...cmd, categoryId: defaultCategoryId };
       }
       return cmd;
     });
 
-    this.categories = this.categories.filter((cat) => cat !== categoryName);
+    this.categories = this.categories.filter((cat) => cat.id !== categoryId);
 
     await Promise.all([
       commandsMoved > 0 ? this.saveCommands() : Promise.resolve(),
@@ -270,39 +307,44 @@ export class LocalMemoService {
   /**
    * Rename a local category
    * Also updates the category of all commands in the category
-   * @param oldName The original category name
+   * @param categoryId The ID of the category to rename
    * @param newName The new category name
    * @returns Promise<boolean> Whether the operation was successful
    */
   public async renameCategory(
-    oldName: string,
+    categoryId: string,
     newName: string
   ): Promise<boolean> {
     const trimmedNewName = newName?.trim();
+    const categoryToRename = this.categories.find(
+      (cat) => cat.id === categoryId
+    );
+
     if (
-      !oldName ||
+      !categoryToRename ||
       !trimmedNewName ||
-      oldName === LocalMemoService.DEFAULT_CATEGORY ||
-      this.categories.includes(trimmedNewName) ||
-      !this.categories.includes(oldName)
+      categoryId === this.getDefaultCategoryId() ||
+      this.categories.some(
+        (cat) => cat.id !== categoryId && cat.name === trimmedNewName
+      )
     ) {
       return false;
     }
 
     let categoryUpdated = false;
     this.categories = this.categories.map((cat) => {
-      if (cat === oldName) {
+      if (cat.id === categoryId) {
         categoryUpdated = true;
-        return trimmedNewName;
+        return { ...cat, id: trimmedNewName, name: trimmedNewName };
       }
       return cat;
     });
 
     let commandsUpdated = false;
     this.commands = this.commands.map((cmd) => {
-      if (cmd.category === oldName) {
+      if (cmd.categoryId === categoryId) {
         commandsUpdated = true;
-        return { ...cmd, category: trimmedNewName };
+        return { ...cmd, categoryId: trimmedNewName };
       }
       return cmd;
     });
@@ -322,22 +364,22 @@ export class LocalMemoService {
   /**
    * Move a local command to a different local category
    * @param commandId The ID of the command to move
-   * @param targetCategory The category to move the command to
+   * @param targetCategoryId The ID of the category to move the command to
    * @returns Promise<boolean> Whether the operation was successful
    */
   public async moveCommandToCategory(
     commandId: string,
-    targetCategory: string
+    targetCategoryId: string
   ): Promise<boolean> {
-    if (!this.categories.includes(targetCategory)) {
+    if (!this.categories.some((cat) => cat.id === targetCategoryId)) {
       return false;
     }
 
     let updated = false;
     this.commands = this.commands.map((cmd) => {
-      if (cmd.id === commandId && cmd.category !== targetCategory) {
+      if (cmd.id === commandId && cmd.categoryId !== targetCategoryId) {
         updated = true;
-        return { ...cmd, category: targetCategory };
+        return { ...cmd, categoryId: targetCategoryId };
       }
       return cmd;
     });
@@ -365,7 +407,7 @@ export class LocalMemoService {
    * @returns Promise that resolves when categories have been saved
    */
   private async saveCategories(): Promise<void> {
-    await this.storageService.setValue(
+    await this.storageService.setValue<Category[]>(
       LocalMemoService.CATEGORIES_KEY,
       this.categories
     );

@@ -5,6 +5,7 @@ import { MemoItem } from "../models/memo-item";
 import { LocalMemoService } from "../services/local-data-service";
 import { CloudStoreService } from "../services/cloud-store-service";
 import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
+import { Category } from "../models/category";
 
 /**
  * Manages the data state for the TreeView
@@ -12,7 +13,7 @@ import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
 export class MemoTreeViewModel {
   private localCommands: MemoItem[] = [];
   private cloudCommands: MemoItem[] = [];
-  private localCategories: string[] = [];
+  private localCategories: Category[] = [];
   private cloudCategoriesSet: Set<string> = new Set();
 
   private localCategoryNodes: Map<string, CategoryTreeItem> = new Map();
@@ -50,14 +51,14 @@ export class MemoTreeViewModel {
   public update(): void {
     // Fetch latest data
     this.localCommands = this.localDataService.getCommands();
-    this.cloudCommands = this.cloudStoreService.getCloudCommands(); // Get cloud commands from new service
+    this.cloudCommands = this.cloudStoreService.getCloudCommands();
     this.localCategories = this.localDataService.getCategories();
 
     // Update cloud categories set
     this.cloudCategoriesSet.clear();
     this.cloudCommands.forEach((cmd) => {
       this.cloudCategoriesSet.add(
-        cmd.category || this.localDataService.getDefaultCategory()
+        cmd.categoryId || this.localDataService.getDefaultCategoryId()
       );
     });
 
@@ -70,12 +71,11 @@ export class MemoTreeViewModel {
    * @returns True if local data exists, false otherwise.
    */
   public hasLocalData(): boolean {
-    return (
-      this.localCommands.length > 0 ||
-      this.localCategories.filter(
-        (cat) => cat !== this.localDataService.getDefaultCategory()
-      ).length > 0
+    // Check if there are commands or non-default categories
+    const hasNonDefaultCategories = this.localCategories.some(
+      (cat) => cat.id !== this.localDataService.getDefaultCategoryId()
     );
+    return this.localCommands.length > 0 || hasNonDefaultCategories;
   }
 
   /**
@@ -86,29 +86,25 @@ export class MemoTreeViewModel {
     this.cloudCategoryNodes.clear();
 
     // --- Create Local Category Nodes ---
-    this.localCategories.forEach((cat) => {
-      const items = this.getLocalCategoryItems(cat);
+    this.localCategories.forEach((category) => {
+      const items = this.getLocalCategoryItems(category.id);
       const collapsibleState =
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
           : vscode.TreeItemCollapsibleState.None;
       this.localCategoryNodes.set(
-        cat,
-        new CategoryTreeItem(
-          cat,
-          collapsibleState, // Set state during creation
-          false // isCloud = false
-        )
+        category.id,
+        new CategoryTreeItem(category, collapsibleState, false)
       );
     });
 
     // --- Create Cloud Category Nodes ---
-    this.cloudCategoriesSet.forEach((cat) => {
-      const items = this.getCloudCategoryItems(cat);
-      // Avoid duplicating default category if it also exists locally and is empty in cloud
+    this.cloudCategoriesSet.forEach((catId) => {
+      const items = this.getCloudCategoryItems(catId);
+
       if (
-        cat === this.localDataService.getDefaultCategory() &&
-        this.localCategoryNodes.has(cat) &&
+        catId === this.localDataService.getDefaultCategoryId() &&
+        this.localCategoryNodes.has(catId) &&
         !items.length
       ) {
         return;
@@ -118,12 +114,8 @@ export class MemoTreeViewModel {
           ? vscode.TreeItemCollapsibleState.Collapsed
           : vscode.TreeItemCollapsibleState.None;
       this.cloudCategoryNodes.set(
-        cat,
-        new CategoryTreeItem(
-          cat,
-          collapsibleState, // Set state during creation
-          true // isCloud = true
-        )
+        catId,
+        new CategoryTreeItem({ id: catId, name: catId }, collapsibleState, true)
       );
     });
 
@@ -160,41 +152,40 @@ export class MemoTreeViewModel {
 
   public getSortedLocalCategories(): CategoryTreeItem[] {
     return Array.from(this.localCategoryNodes.values()).sort((a, b) =>
-      a.label.localeCompare(b.label)
+      a.category.name.localeCompare(b.category.name)
     );
   }
 
   public getSortedCloudCategories(): CategoryTreeItem[] {
-    // Filter out empty default category if it exists locally
-    const cloudCats = Array.from(this.cloudCategoryNodes.values()).filter(
-      (node) => {
+    const cloudCats = Array.from(this.cloudCategoryNodes.values())
+      .filter((node) => {
         if (
-          node.label === this.localDataService.getDefaultCategory() &&
-          this.localCategoryNodes.has(node.label)
+          node.category.id === this.localDataService.getDefaultCategoryId() &&
+          this.localCategoryNodes.has(node.category.id)
         ) {
-          return this.getCloudCategoryItems(node.label).length > 0;
+          return this.getCloudCategoryItems(node.category.id).length > 0;
         }
         return true;
-      }
-    );
-    return cloudCats.sort((a, b) => a.label.localeCompare(b.label));
+      })
+      .sort((a, b) => a.category.name.localeCompare(b.category.name));
+    return cloudCats;
   }
 
-  public getLocalCategoryItems(category: string): MemoItem[] {
+  public getLocalCategoryItems(categoryId: string): MemoItem[] {
     return this.localCommands
-      .filter((item) => item.category === category)
+      .filter((item) => item.categoryId === categoryId)
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  public getCloudCategoryItems(category: string): MemoItem[] {
+  public getCloudCategoryItems(categoryId: string): MemoItem[] {
     return this.cloudCommands
-      .filter((item) => item.category === category)
+      .filter((item) => item.categoryId === categoryId)
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
   public getCategoryNodeForItem(item: MemoItem): CategoryTreeItem | undefined {
     return item.isCloud
-      ? this.cloudCategoryNodes.get(item.category)
-      : this.localCategoryNodes.get(item.category);
+      ? this.cloudCategoryNodes.get(item.categoryId)
+      : this.localCategoryNodes.get(item.categoryId);
   }
 }

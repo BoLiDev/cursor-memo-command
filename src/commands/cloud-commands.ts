@@ -22,18 +22,18 @@ export function createRemoveCloudCategoryHandler(
   return async (categoryItem: CategoryTreeItem) => {
     if (!categoryItem) return;
 
-    const categoryName = categoryItem.label;
+    const categoryId = categoryItem.category.id;
 
-    const result = await cloudStoreService.removeCloudCategory(categoryName);
+    const result = await cloudStoreService.removeCloudCategory(categoryId);
 
     if (result.success) {
       memoTreeProvider.updateView();
       vscode.window.showInformationMessage(
-        `Removed cloud category "${categoryName}" from local storage. ${result.removedCommands} command(s) removed.`
+        `Removed cloud category "${categoryItem.category.name}" from local storage. ${result.removedCommands} command(s) removed.`
       );
     } else {
       vscode.window.showErrorMessage(
-        `Failed to remove cloud category "${categoryName}"`
+        `Failed to remove cloud category "${categoryItem.category.name}"`
       );
     }
   };

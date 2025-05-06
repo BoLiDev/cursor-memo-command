@@ -1,6 +1,7 @@
 /** @format */
 
 import * as vscode from "vscode";
+import { Category } from "../models/category"; // Import Category
 
 /**
  * Represents a top-level group (e.g., "Local", "Cloud") in the TreeView.
@@ -26,12 +27,13 @@ export class CategoryGroupTreeItem extends vscode.TreeItem {
  */
 export class CategoryTreeItem extends vscode.TreeItem {
   constructor(
-    public readonly label: string,
+    public readonly category: Category,
     public collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly isCloud: boolean // Flag to know if it's a cloud category
   ) {
-    super(label, collapsibleState);
-    this.tooltip = `${this.label}`;
+    super(category.name, collapsibleState);
+    this.tooltip = `${category.name}`;
+    this.id = category.id;
     // Set context value based on category type
     this.contextValue = this.isCloud ? "cloudCategory" : "category";
     this.iconPath = vscode.ThemeIcon.Folder;

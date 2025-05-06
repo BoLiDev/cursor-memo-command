@@ -85,7 +85,10 @@ export class CloudStoreService {
         const commandsData = parseCommands(decodedContent);
         const commands = toMemoItems(commandsData);
         const categories = Object.keys(commandsData);
-        return { success: true, data: { commands, categories } };
+        return {
+          success: true,
+          data: { commands: commands as MemoItem[], categories },
+        };
       } catch (parseError: any) {
         console.error("Failed to parse command data:", parseError);
         return {
@@ -148,7 +151,7 @@ export class CloudStoreService {
     const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
     const filteredCommands = allImportedCommands.filter((cmd) =>
       selectedCategories.includes(
-        cmd.category || CloudStoreService.DEFAULT_CATEGORY
+        cmd.categoryId || CloudStoreService.DEFAULT_CATEGORY
       )
     );
 
@@ -189,7 +192,7 @@ export class CloudStoreService {
   }> {
     const originalLength = this.cloudCommands.length;
     this.cloudCommands = this.cloudCommands.filter(
-      (cmd) => cmd.category !== categoryName
+      (cmd) => cmd.categoryId !== categoryName
     );
     const removedCount = originalLength - this.cloudCommands.length;
 
@@ -363,7 +366,7 @@ function removeDuplicateCommands(commands: MemoItem[]): MemoItem[] {
   const finalMap = new Map<string, MemoItem>();
 
   commands.forEach((cmd) => {
-    const aliasKey = `${cmd.category}:${cmd.alias || cmd.label}`;
+    const aliasKey = `${cmd.categoryId}:${cmd.alias || cmd.label}`;
     // Always add/overwrite by ID if present
     if (cmd.id) {
       const existingById = finalMap.get(cmd.id);

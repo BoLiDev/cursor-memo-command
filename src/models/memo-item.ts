@@ -9,6 +9,6 @@ export interface MemoItem {
   command: string;
   timestamp: number;
   alias?: string;
-  category: string;
+  categoryId: string;
   isCloud?: boolean;
 }

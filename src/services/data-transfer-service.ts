@@ -23,7 +23,8 @@ export class DataTransferService {
    */
   public exportData(): string {
     const commands = this.dataService.getCommands();
-    const commandsData = fromMemoItems(commands);
+    const categories = this.dataService.getCategories();
+    const commandsData = fromMemoItems(commands, categories);
     return serializeCommands(commandsData);
   }
 
@@ -35,9 +36,10 @@ export class DataTransferService {
   public exportSelectedCategories(selectedCategories: string[]): string {
     const filteredCommands = this.dataService
       .getCommands()
-      .filter((cmd) => selectedCategories.includes(cmd.category));
+      .filter((cmd) => selectedCategories.includes(cmd.categoryId));
 
-    const commandsData = fromMemoItems(filteredCommands);
+    const categories = this.dataService.getCategories();
+    const commandsData = fromMemoItems(filteredCommands, categories);
     return serializeCommands(commandsData);
   }
 
@@ -56,19 +58,20 @@ export class DataTransferService {
       const commandsData = parseCommands(jsonData);
 
       // 获取分类
-      const categories = Object.keys(commandsData);
+      const categoryNames = Object.keys(commandsData);
 
       // 转换为内部格式
       const commands = toMemoItems(commandsData);
 
       // 处理分类
       const currentCategories = this.dataService.getCategories();
-      const newCategories = categories.filter(
-        (cat) => cat.trim() !== "" && !currentCategories.includes(cat)
+      const currentCategoryIds = new Set(currentCategories.map((c) => c.id));
+      const newCategoryNames = categoryNames.filter(
+        (catName) => catName.trim() !== "" && !currentCategoryIds.has(catName)
       );
 
-      if (newCategories.length > 0) {
-        await this.dataService.addCategories(newCategories);
+      if (newCategoryNames.length > 0) {
+        await this.dataService.addCategories(newCategoryNames);
       }
 
       // 处理命令
@@ -79,7 +82,7 @@ export class DataTransferService {
       return {
         success: true,
         importedCommands: commands.length,
-        importedCategories: newCategories.length,
+        importedCategories: newCategoryNames.length,
       };
     } catch (error) {
       console.error("Import error:", error);
@@ -112,25 +115,26 @@ export class DataTransferService {
       // 过滤出选中的分类
       const filteredData: z.infer<typeof CommandsStructureSchema> = {};
       Object.keys(allCommandsData)
-        .filter((category) => selectedCategories.includes(category))
-        .forEach((category) => {
-          filteredData[category] = allCommandsData[category];
+        .filter((categoryName) => selectedCategories.includes(categoryName))
+        .forEach((categoryName) => {
+          filteredData[categoryName] = allCommandsData[categoryName];
         });
 
       // 获取分类
-      const categories = Object.keys(filteredData);
+      const categoryNames = Object.keys(filteredData);
 
       // 转换为内部格式
       const commands = toMemoItems(filteredData);
 
       // 处理分类
       const currentCategories = this.dataService.getCategories();
-      const newCategories = categories.filter(
-        (cat) => cat.trim() !== "" && !currentCategories.includes(cat)
+      const currentCategoryIds = new Set(currentCategories.map((c) => c.id));
+      const newCategoryNames = categoryNames.filter(
+        (catName) => catName.trim() !== "" && !currentCategoryIds.has(catName)
       );
 
-      if (newCategories.length > 0) {
-        await this.dataService.addCategories(newCategories);
+      if (newCategoryNames.length > 0) {
+        await this.dataService.addCategories(newCategoryNames);
       }
 
       // 处理命令
@@ -141,7 +145,7 @@ export class DataTransferService {
       return {
         success: true,
         importedCommands: commands.length,
-        importedCategories: newCategories.length,
+        importedCategories: newCategoryNames.length,
       };
     } catch (error) {
       console.error("Import error:", error);
