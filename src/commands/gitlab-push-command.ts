@@ -1,18 +1,21 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { GitlabClient } from "../services/gitlab-service";
+import {
+  CloudStoreService,
+  CloudOperationResult,
+} from "../services/cloud-store-service";
 import { LocalMemoService } from "../services/local-data-service";
 import { MemoItem } from "../models/memo-item";
 
 /**
  * Creates a "Push to GitLab" command handler
- * @param gitlabService GitLab service client
+ * @param cloudStoreService Service managing cloud state and push operations
  * @param localMemoService Local memo service
  * @returns "Push to GitLab" command handler
  */
 export function createPushToGitLabHandler(
-  gitlabService: GitlabClient,
+  cloudStoreService: CloudStoreService,
   localMemoService: LocalMemoService
 ): (...args: any[]) => Promise<void> {
   return async () => {
@@ -111,31 +114,41 @@ export function createPushToGitLabHandler(
 
         try {
           progress.report({ message: "Creating merge request..." });
-          const result = await gitlabService.pushCommandsToGitLab(
+
+          const result = await cloudStoreService.pushCommandsToGitLab(
             commandsToUpload,
             categories
           );
 
           if (result.success) {
             const openMrAction = "Open Merge Request";
-            const message = `Successfully pushed ${result.pushedCommands} commands to GitLab as a merge request.`;
+            const message = `Successfully pushed ${result.data.pushedCommands} commands to GitLab as a merge request.`;
 
             const selection = await vscode.window.showInformationMessage(
               message,
               openMrAction
             );
 
-            if (selection === openMrAction && result.mergeRequestUrl) {
-              vscode.env.openExternal(vscode.Uri.parse(result.mergeRequestUrl));
+            if (selection === openMrAction && result.data.mergeRequestUrl) {
+              vscode.env.openExternal(
+                vscode.Uri.parse(result.data.mergeRequestUrl)
+              );
             }
           } else {
-            vscode.window.showErrorMessage(
-              `Error pushing to GitLab: ${result.error || "Unknown error"}`
-            );
+            if (result.needsAuth) {
+              vscode.window.showWarningMessage(
+                "GitLab token is missing or invalid for push."
+              );
+              vscode.commands.executeCommand("cursor-memo.manageGitLabToken");
+            } else {
+              vscode.window.showErrorMessage(
+                `Error pushing to GitLab: ${result.error}`
+              );
+            }
           }
         } catch (error: any) {
           vscode.window.showErrorMessage(
-            `Exception during push to GitLab: ${error.message || "Unknown error"}`
+            `Unexpected error during push: ${error.message || "Unknown error"}`
           );
         }
       }

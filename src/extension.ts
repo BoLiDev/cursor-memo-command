@@ -4,9 +4,10 @@ import * as vscode from "vscode";
 
 // Import services
 import { LocalMemoService } from "./services/local-data-service";
-import { GitlabClient } from "./services/gitlab-service"; // Renamed to GitlabClient, handles cloud
-import { StorageService } from "./services/storage-service"; // Import StorageService
-import { ConfigurationService } from "./services/configuration-service"; // Import ConfigurationService
+import { GitlabApiService } from "./services/gitlab-api-service"; // Import new API service
+import { CloudStoreService } from "./services/cloud-store-service"; // Import new cloud state service
+import { StorageService } from "./services/storage-service";
+import { ConfigurationService } from "./services/configuration-service";
 
 // Import view provider and required types
 import {
@@ -62,14 +63,24 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Instantiate dependent services, injecting dependencies
   const localMemoService = new LocalMemoService(storageService);
-  const gitlabService = new GitlabClient(storageService, configService);
+
+  // Instantiate new GitLab services
+  const gitlabApiService = new GitlabApiService(storageService, configService);
+  const cloudStoreService = new CloudStoreService(
+    storageService,
+    configService,
+    gitlabApiService
+  );
 
   // Initialize both services (they load their respective data)
   await localMemoService.initialize();
-  await gitlabService.initialize(); // GitlabClient now needs initialization
+  await cloudStoreService.initialize(); // Initialize new CloudStoreService
 
   // Instantiate TreeDataProvider with both services
-  memoTreeProvider = new MemoTreeDataProvider(localMemoService, gitlabService);
+  memoTreeProvider = new MemoTreeDataProvider(
+    localMemoService,
+    cloudStoreService
+  );
 
   // Register Tree View
   memoTreeView = vscode.window.createTreeView("cursorMemoPanel", {
@@ -125,19 +136,19 @@ export async function activate(context: vscode.ExtensionContext) {
       memoTreeProvider
     ),
 
-    // Cloud/GitLab Commands (use gitlabService)
+    // Cloud/GitLab Commands (use cloudStoreService)
     "cursor-memo.removeCloudCategory": createRemoveCloudCategoryHandler(
-      gitlabService, // Pass gitlabService now
+      cloudStoreService,
       memoTreeProvider
     ),
     "cursor-memo.syncFromGitLab": createSyncFromGitLabHandler(
-      gitlabService, // Pass gitlabService now
+      cloudStoreService,
       memoTreeProvider
     ),
     "cursor-memo.manageGitLabToken":
-      createManageGitLabTokenHandler(gitlabService), // Pass gitlabService now
+      createManageGitLabTokenHandler(cloudStoreService),
     "cursor-memo.pushToGitLab": createPushToGitLabHandler(
-      gitlabService,
+      cloudStoreService,
       localMemoService
     ),
 

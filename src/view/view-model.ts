@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { MemoItem } from "../models/memo-item";
 import { LocalMemoService } from "../services/local-data-service";
-import { GitlabClient } from "../services/gitlab-service";
+import { CloudStoreService } from "../services/cloud-store-service";
 import { CategoryTreeItem, CategoryGroupTreeItem } from "./tree-items";
 
 /**
@@ -24,11 +24,11 @@ export class MemoTreeViewModel {
   /**
    * Constructor
    * @param localDataService Service for local data
-   * @param gitlabService Service for cloud data
+   * @param cloudStoreService Service for cloud data
    */
   constructor(
     private localDataService: LocalMemoService,
-    private gitlabService: GitlabClient // Accept GitlabClient
+    private cloudStoreService: CloudStoreService
   ) {
     // Initialize group nodes
     this.localGroupNode = new CategoryGroupTreeItem(
@@ -50,7 +50,7 @@ export class MemoTreeViewModel {
   public update(): void {
     // Fetch latest data
     this.localCommands = this.localDataService.getCommands();
-    this.cloudCommands = this.gitlabService.getCloudCommands(); // Get cloud commands
+    this.cloudCommands = this.cloudStoreService.getCloudCommands(); // Get cloud commands from new service
     this.localCategories = this.localDataService.getCategories();
 
     // Update cloud categories set

@@ -1,19 +1,22 @@
 /** @format */
 
 import * as vscode from "vscode";
-import { GitlabClient } from "../services/gitlab-service";
+import {
+  CloudStoreService,
+  CloudOperationResult,
+} from "../services/cloud-store-service";
 import { MemoTreeDataProvider } from "../view/tree-provider";
 import { CategoryTreeItem } from "../view/tree-items";
 
 /**
  * Creates the remove cloud category handler.
  * Allows removing a cloud category locally without affecting remote data.
- * @param gitlabService The GitLab service client
+ * @param cloudStoreService The service managing cloud command state
  * @param memoTreeProvider The memo tree data provider
  * @returns The remove cloud category handler function
  */
 export function createRemoveCloudCategoryHandler(
-  gitlabService: GitlabClient,
+  cloudStoreService: CloudStoreService,
   memoTreeProvider: MemoTreeDataProvider
 ): (...args: any[]) => Promise<void> {
   return async (categoryItem: CategoryTreeItem) => {
@@ -21,7 +24,7 @@ export function createRemoveCloudCategoryHandler(
 
     const categoryName = categoryItem.label;
 
-    const result = await gitlabService.removeCloudCategory(categoryName);
+    const result = await cloudStoreService.removeCloudCategory(categoryName);
 
     if (result.success) {
       memoTreeProvider.updateView();
@@ -38,72 +41,86 @@ export function createRemoveCloudCategoryHandler(
 
 /**
  * Creates the sync from GitLab command handler
- * @param gitlabService The GitLab service client
+ * @param cloudStoreService The service managing cloud command state
  * @param memoTreeProvider The memo tree data provider
  * @returns The sync from GitLab command handler function
  */
 export function createSyncFromGitLabHandler(
-  gitlabService: GitlabClient,
+  cloudStoreService: CloudStoreService,
   memoTreeProvider: MemoTreeDataProvider
 ): (...args: any[]) => Promise<void> {
   return async () => {
-    // First fetch all available categories from GitLab
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: "Fetching categories from GitLab",
+        title: "Syncing from GitLab",
         cancellable: false,
       },
       async (progress) => {
-        progress.report({ message: "Retrieving available categories..." });
+        progress.report({ message: "Fetching categories..." });
 
-        try {
-          // Get available categories from GitLab
-          const cloudCategories =
-            await gitlabService.fetchAvailableCategories();
+        const categoriesResult =
+          await cloudStoreService.fetchAvailableCategories();
 
-          if (!cloudCategories || cloudCategories.length === 0) {
-            vscode.window.showInformationMessage(
-              "No categories available on GitLab"
+        if (!categoriesResult.success) {
+          if (categoriesResult.needsAuth) {
+            vscode.window.showWarningMessage(
+              "GitLab token is missing or invalid."
             );
-            return;
-          }
-
-          // Let user select categories to sync
-          const selectedOption = await vscode.window.showQuickPick(
-            cloudCategories,
-            {
-              placeHolder: "Select categories to sync from cloud",
-              canPickMany: true,
-            }
-          );
-
-          if (!selectedOption || selectedOption.length === 0) {
-            return;
-          }
-
-          // Perform sync based on user selection
-          progress.report({
-            message: `Syncing ${selectedOption.length} selected categories...`,
-          });
-
-          const result =
-            await gitlabService.syncSelectedFromGitLab(selectedOption);
-
-          if (result.success) {
-            memoTreeProvider.updateView();
-            vscode.window.showInformationMessage(
-              `Synced ${result.syncedCommands} command(s) from GitLab`
-            );
+            vscode.commands.executeCommand("cursor-memo.manageGitLabToken");
           } else {
             vscode.window.showErrorMessage(
-              `Error syncing from GitLab: ${result.error || "Unknown error"}`
+              `Failed to fetch categories: ${categoriesResult.error}`
             );
           }
-        } catch (error) {
-          vscode.window.showErrorMessage(
-            `Error connecting to GitLab: ${error instanceof Error ? error.message : "Unknown error"}`
+          return;
+        }
+
+        const cloudCategories = categoriesResult.data;
+        if (!cloudCategories || cloudCategories.length === 0) {
+          vscode.window.showInformationMessage(
+            "No categories found on GitLab to sync."
           );
+          return;
+        }
+
+        // Let user select categories to sync
+        const selectedOption = await vscode.window.showQuickPick(
+          cloudCategories,
+          {
+            placeHolder: "Select categories to sync from cloud",
+            canPickMany: true,
+          }
+        );
+
+        if (!selectedOption || selectedOption.length === 0) {
+          return;
+        }
+
+        // Perform sync based on user selection
+        progress.report({
+          message: `Syncing ${selectedOption.length} selected categories...`,
+        });
+
+        const syncResult =
+          await cloudStoreService.syncSelectedFromGitLab(selectedOption);
+
+        if (syncResult.success) {
+          memoTreeProvider.updateView();
+          vscode.window.showInformationMessage(
+            `Synced ${syncResult.data.syncedCommands} command(s) from selected GitLab categories.`
+          );
+        } else {
+          if (syncResult.needsAuth) {
+            vscode.window.showWarningMessage(
+              "GitLab token became invalid during sync."
+            );
+            vscode.commands.executeCommand("cursor-memo.manageGitLabToken");
+          } else {
+            vscode.window.showErrorMessage(
+              `Error syncing from GitLab: ${syncResult.error}`
+            );
+          }
         }
       }
     );
@@ -112,25 +129,28 @@ export function createSyncFromGitLabHandler(
 
 /**
  * Creates the manage GitLab token command handler
- * @param gitlabService The GitLab service client
+ * @param cloudStoreService The service managing cloud command state (and token storage)
  * @returns The manage GitLab token command handler function
  */
 export function createManageGitLabTokenHandler(
-  gitlabService: GitlabClient
+  cloudStoreService: CloudStoreService
 ): (...args: any[]) => Promise<void> {
   return async () => {
+    const currentTokenAction = "View Current Token (Not Recommended)";
     const token = await vscode.window.showInputBox({
       password: true,
-      placeHolder: "Enter your GitLab Personal Access Token",
+      placeHolder: "Enter new GitLab Personal Access Token (PAT)",
       prompt:
         "Token needed for GitLab sync. Leave blank to clear existing token.",
+      ignoreFocusOut: true,
+      title: "Manage GitLab Token",
     });
 
     if (token === "") {
-      await gitlabService.clearToken();
+      await cloudStoreService.clearToken();
       vscode.window.showInformationMessage("GitLab token cleared");
     } else if (token) {
-      await gitlabService.setToken(token);
+      await cloudStoreService.setToken(token);
       vscode.window.showInformationMessage("GitLab token saved");
     }
   };

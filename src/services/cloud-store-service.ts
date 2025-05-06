@@ -1,0 +1,415 @@
+/** @format */
+
+import * as vscode from "vscode";
+import * as os from "os";
+import { MemoItem } from "../models/memo-item";
+import {
+  fromMemoItems,
+  parseCommands,
+  serializeCommands,
+  toMemoItems,
+} from "../zod/command-schema";
+import { StorageService } from "./storage-service";
+import { ConfigurationService } from "./configuration-service";
+import { GitlabApiService, GitlabApiError } from "./gitlab-api-service";
+
+// Result type for operations that might require user interaction (like missing token)
+export type CloudOperationResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string; needsAuth?: boolean };
+
+/**
+ * Manages the state of cloud-synchronized commands.
+ * Interacts with GitlabApiService to fetch/push data and StorageService to persist state.
+ */
+export class CloudStoreService {
+  private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
+  private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
+  private static DEFAULT_CATEGORY = "Default";
+
+  private cloudCommands: MemoItem[] = [];
+  private initialized: boolean = false;
+
+  constructor(
+    private storageService: StorageService,
+    private configService: ConfigurationService,
+    private gitlabApiService: GitlabApiService
+  ) {}
+
+  /**
+   * Initialize the service by loading stored cloud commands.
+   */
+  public async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+    await this.loadCloudCommands();
+    this.initialized = true;
+    console.log(
+      `CloudStoreService initialized with ${this.cloudCommands.length} commands.`
+    );
+  }
+
+  /**
+   * Get all currently stored cloud commands.
+   */
+  public getCloudCommands(): MemoItem[] {
+    return [...this.cloudCommands];
+  }
+
+  /**
+   * Fetches, decodes, parses, and validates team commands from GitLab.
+   * Does not update internal state.
+   */
+  private async fetchAndParseTeamCommands(): Promise<
+    CloudOperationResult<{ commands: MemoItem[]; categories: string[] }>
+  > {
+    try {
+      const fileData = await this.gitlabApiService.getFileContent();
+
+      if (!fileData.content) {
+        console.error(
+          "getFileContent returned success but content was missing."
+        );
+        return {
+          success: false,
+          error: "File content is empty or missing in GitLab response.",
+        };
+      }
+
+      const decodedContent = Buffer.from(fileData.content, "base64").toString(
+        "utf-8"
+      );
+
+      try {
+        const commandsData = parseCommands(decodedContent);
+        const commands = toMemoItems(commandsData);
+        const categories = Object.keys(commandsData);
+        return { success: true, data: { commands, categories } };
+      } catch (parseError: any) {
+        console.error("Failed to parse command data:", parseError);
+        return {
+          success: false,
+          error: `Invalid command data: ${parseError.message}`,
+        };
+      }
+    } catch (error) {
+      console.error("Failed to fetch team commands from GitLab:", error);
+      if (error instanceof GitlabApiError && error.status === 401) {
+        return { success: false, error: error.message, needsAuth: true };
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unknown error fetching team commands";
+      return { success: false, error: message };
+    }
+  }
+
+  // --- Cloud Command State Management Methods ---
+
+  /**
+   * Fetches all commands from GitLab and updates the local cloud state.
+   */
+  public async syncAllFromGitLab(): Promise<
+    CloudOperationResult<{ syncedCommands: number }>
+  > {
+    const fetchResult = await this.fetchAndParseTeamCommands();
+
+    if (!fetchResult.success) {
+      return fetchResult;
+    }
+
+    this.cloudCommands = fetchResult.data.commands.map((cmd) => ({
+      ...cmd,
+      isCloud: true,
+    }));
+
+    await this.saveCloudCommands();
+    console.log(`Synced ${this.cloudCommands.length} commands from GitLab.`);
+    return {
+      success: true,
+      data: { syncedCommands: this.cloudCommands.length },
+    };
+  }
+
+  /**
+   * Fetches commands from GitLab, filters by selected categories, and updates local cloud state.
+   */
+  public async syncSelectedFromGitLab(
+    selectedCategories: string[]
+  ): Promise<CloudOperationResult<{ syncedCommands: number }>> {
+    const fetchResult = await this.fetchAndParseTeamCommands();
+
+    if (!fetchResult.success) {
+      return fetchResult;
+    }
+
+    const allImportedCommands: MemoItem[] = fetchResult.data.commands || [];
+    const filteredCommands = allImportedCommands.filter((cmd) =>
+      selectedCategories.includes(
+        cmd.category || CloudStoreService.DEFAULT_CATEGORY
+      )
+    );
+
+    this.cloudCommands = filteredCommands.map((cmd) => ({
+      ...cmd,
+      isCloud: true,
+    }));
+
+    await this.saveCloudCommands();
+    console.log(
+      `Synced ${this.cloudCommands.length} commands from selected categories: ${selectedCategories.join(", ")}`
+    );
+    return {
+      success: true,
+      data: { syncedCommands: this.cloudCommands.length },
+    };
+  }
+
+  /**
+   * Fetches available categories from GitLab without updating local state.
+   */
+  public async fetchAvailableCategories(): Promise<
+    CloudOperationResult<string[]>
+  > {
+    const fetchResult = await this.fetchAndParseTeamCommands();
+    if (!fetchResult.success) {
+      return fetchResult;
+    }
+    return { success: true, data: fetchResult.data.categories || [] };
+  }
+
+  /**
+   * Removes a cloud category and its associated commands from the local cloud state.
+   */
+  public async removeCloudCategory(categoryName: string): Promise<{
+    success: boolean;
+    removedCommands: number;
+  }> {
+    const originalLength = this.cloudCommands.length;
+    this.cloudCommands = this.cloudCommands.filter(
+      (cmd) => cmd.category !== categoryName
+    );
+    const removedCount = originalLength - this.cloudCommands.length;
+
+    if (removedCount > 0) {
+      await this.saveCloudCommands();
+      console.log(
+        `Removed cloud category '${categoryName}' (${removedCount} commands) from local store.`
+      );
+      return { success: true, removedCommands: removedCount };
+    } else {
+      console.log(
+        `Cloud category '${categoryName}' not found in local store or had no commands.`
+      );
+      return { success: true, removedCommands: 0 };
+    }
+  }
+
+  /**
+   * Pushes specified commands to GitLab by creating a merge request.
+   * Merges provided commands with the current remote state before pushing.
+   * @param commandsToPush Array of MemoItems to add/update in GitLab.
+   * @param involvedCategories List of categories involved (for commit/MR message).
+   */
+  public async pushCommandsToGitLab(
+    commandsToPush: MemoItem[],
+    involvedCategories: string[]
+  ): Promise<
+    CloudOperationResult<{ mergeRequestUrl: string; pushedCommands: number }>
+  > {
+    if (commandsToPush.length === 0) {
+      return { success: false, error: "No commands selected for pushing." };
+    }
+
+    try {
+      // 1. Fetch current remote state
+      console.log("Fetching remote state before push...");
+      const fetchResult = await this.fetchAndParseTeamCommands();
+
+      let remoteCommands: MemoItem[] = [];
+      if (fetchResult.success) {
+        remoteCommands = fetchResult.data.commands;
+      } else if (fetchResult.needsAuth) {
+        return fetchResult;
+      } else if (fetchResult.error && !fetchResult.error.includes("404")) {
+        return {
+          success: false,
+          error: `Failed to fetch remote state: ${fetchResult.error}`,
+        };
+      }
+      console.log(`Fetched ${remoteCommands.length} remote commands.`);
+
+      // 2. Merge and prepare new content
+      const allCommands = [...remoteCommands, ...commandsToPush];
+      const processedCommands = allCommands.map((cmd) => ({
+        ...cmd,
+        alias: cmd.alias || cmd.label,
+      }));
+      const uniqueCommands = removeDuplicateCommands(processedCommands);
+      const commandsData = fromMemoItems(uniqueCommands);
+      const newFileContent = serializeCommands(commandsData);
+      const newFileContentBase64 =
+        Buffer.from(newFileContent).toString("base64");
+
+      const newCommandsCount = uniqueCommands.length - remoteCommands.length;
+      const updatedCount = commandsToPush.length - newCommandsCount;
+      console.log(
+        `Prepared content: ${uniqueCommands.length} total unique commands (${newCommandsCount} new, ${updatedCount} updated).`
+      );
+
+      // 3. Create Branch
+      const timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
+      const branchName = `cursor_memo_update_${timestamp}`;
+      console.log(`Creating branch: ${branchName}...`);
+      await this.gitlabApiService.createBranch(branchName);
+      console.log(`Branch ${branchName} created.`);
+
+      // 4. Commit File
+      const filePath = this.configService.getGitlabFilePath();
+      const commitMessage = `Update prompt commands: added ${newCommandsCount} new, updated ${updatedCount}.`;
+      console.log(
+        `Committing changes to ${filePath} on branch ${branchName}...`
+      );
+      await this.gitlabApiService.commitFileChange(
+        branchName,
+        filePath,
+        newFileContentBase64,
+        commitMessage
+      );
+      console.log(`Changes committed.`);
+
+      // 5. Create Merge Request
+      const targetBranch = this.configService.getGitlabBranch();
+      const mrTitle = `Update prompt commands from ${os.hostname() || "local"}`;
+      const mrDescription = `This merge request adds ${newCommandsCount} new command(s) and updates ${updatedCount} existing command(s) from categories: ${involvedCategories.join(", ")}.`;
+      console.log(
+        `Creating merge request from ${branchName} to ${targetBranch}...`
+      );
+      const mrResult = await this.gitlabApiService.createMergeRequest(
+        branchName,
+        targetBranch,
+        mrTitle,
+        mrDescription
+      );
+      console.log(`Merge request created: ${mrResult.web_url}`);
+
+      return {
+        success: true,
+        data: {
+          mergeRequestUrl: mrResult.web_url,
+          pushedCommands: commandsToPush.length,
+        },
+      };
+    } catch (error) {
+      console.error("Error during pushCommandsToGitLab:", error);
+      if (error instanceof GitlabApiError && error.status === 401) {
+        return { success: false, error: error.message, needsAuth: true };
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unknown error during push operation.";
+      return { success: false, error: message };
+    }
+  }
+
+  // --- Token Management --- (Moved from GitlabClient, using StorageService)
+
+  /**
+   * Set GitLab Personal Access Token.
+   */
+  public async setToken(token: string): Promise<void> {
+    await this.storageService.setSecret(
+      CloudStoreService.GITLAB_TOKEN_KEY,
+      token
+    );
+    console.log("GitLab token stored.");
+  }
+
+  /**
+   * Clear stored GitLab Personal Access Token.
+   */
+  public async clearToken(): Promise<void> {
+    await this.storageService.deleteSecret(CloudStoreService.GITLAB_TOKEN_KEY);
+    console.log("GitLab token cleared.");
+  }
+
+  // --- Persistence Methods ---
+
+  private async saveCloudCommands(): Promise<void> {
+    await this.storageService.setValue(
+      CloudStoreService.CLOUD_COMMANDS_KEY,
+      this.cloudCommands
+    );
+  }
+
+  private async loadCloudCommands(): Promise<void> {
+    const stored = this.storageService.getValue<MemoItem[]>(
+      CloudStoreService.CLOUD_COMMANDS_KEY,
+      []
+    );
+    this.cloudCommands = stored.map((cmd) => ({ ...cmd, isCloud: true }));
+  }
+}
+
+// --- Helper Function (Copied from GitlabClient) ---
+// TODO: Move this to a shared utility module?
+function removeDuplicateCommands(commands: MemoItem[]): MemoItem[] {
+  const idMap = new Map<string, MemoItem>();
+  const aliasMap = new Map<string, MemoItem>();
+
+  const finalMap = new Map<string, MemoItem>();
+
+  commands.forEach((cmd) => {
+    const aliasKey = `${cmd.category}:${cmd.alias || cmd.label}`;
+    // Always add/overwrite by ID if present
+    if (cmd.id) {
+      const existingById = finalMap.get(cmd.id);
+      if (!existingById || !existingById.isCloud || cmd.isCloud === false) {
+        finalMap.set(cmd.id, cmd);
+      }
+    }
+    // Add/overwrite by alias+category key, preferring local
+    const existingByAlias = finalMap.get(aliasKey);
+    if (!existingByAlias || !existingByAlias.isCloud || cmd.isCloud === false) {
+      let alreadyPresentById = false;
+      if (cmd.id) {
+        finalMap.forEach((value, key) => {
+          if (value.id === cmd.id && key !== aliasKey && key !== cmd.id) {
+            alreadyPresentById = true;
+            if (!value.isCloud || cmd.isCloud === false) {
+              finalMap.delete(key);
+              finalMap.set(aliasKey, cmd);
+            }
+          }
+        });
+      }
+      if (!alreadyPresentById) {
+        finalMap.set(aliasKey, cmd);
+      }
+    }
+    // If cmd.id exists and is different from aliasKey, ensure it's in the map.
+    if (cmd.id && cmd.id !== aliasKey && !finalMap.has(cmd.id)) {
+      const existingById = finalMap.get(cmd.id);
+      if (!existingById || !existingById.isCloud || cmd.isCloud === false) {
+        finalMap.set(cmd.id, cmd);
+      }
+    }
+  });
+
+  // Filter results to ensure no duplicate IDs resulted from alias mapping overwrite
+  const uniqueByIdResult: MemoItem[] = [];
+  const seenIds = new Set<string>();
+  finalMap.forEach((item) => {
+    if (item.id && !seenIds.has(item.id)) {
+      uniqueByIdResult.push(item);
+      seenIds.add(item.id);
+    } else if (!item.id) {
+      uniqueByIdResult.push(item);
+    }
+  });
+
+  return uniqueByIdResult;
+}
