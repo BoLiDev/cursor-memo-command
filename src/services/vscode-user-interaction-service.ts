@@ -151,50 +151,204 @@ export class VSCodeUserInteractionService {
     return vscode.window.withProgress(options, task);
   }
 
+  /**
+   * Creates a custom webview with a multiline text area for entering larger text content
+   * @param title Title displayed in the webview panel
+   * @param placeHolder Placeholder text for the text area
+   * @param value Initial value for the text area
+   * @returns Promise that resolves to the entered text or undefined if canceled
+   */
   async createMultilineInputBox(
     title: string,
     placeHolder: string,
     value: string = ""
   ): Promise<string | undefined> {
-    const inputBox = vscode.window.createInputBox();
-    inputBox.title = title;
-    inputBox.placeholder = placeHolder;
-    inputBox.value = value;
-    inputBox.ignoreFocusOut = true;
-    inputBox.buttons = [
+    // Create and show webview panel
+    const panel = vscode.window.createWebviewPanel(
+      "multilineInput",
+      title,
+      vscode.ViewColumn.Active,
       {
-        iconPath: new vscode.ThemeIcon("save"),
-        tooltip: "Confirm (Enter)",
-      },
-    ];
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
+    );
 
-    return new Promise((resolve) => {
-      let resolved = false;
-      inputBox.onDidAccept(() => {
-        if (resolved) return;
-        resolved = true;
-        resolve(inputBox.value);
-        inputBox.hide();
-        inputBox.dispose();
-      });
+    // HTML content for the webview
+    panel.webview.html = this.getMultilineInputHtml(
+      panel.webview,
+      placeHolder,
+      value
+    );
 
-      inputBox.onDidTriggerButton(() => {
-        if (resolved) return;
-        resolved = true;
-        resolve(inputBox.value);
-        inputBox.hide();
-        inputBox.dispose();
-      });
-
-      inputBox.onDidHide(() => {
-        if (!resolved) {
-          resolve(undefined);
+    // Set up messaging and return a promise
+    return new Promise<string | undefined>((resolve) => {
+      // Handle messages from the webview
+      panel.webview.onDidReceiveMessage((message) => {
+        switch (message.command) {
+          case "save":
+            resolve(message.text);
+            panel.dispose();
+            break;
+          case "cancel":
+            resolve(undefined);
+            panel.dispose();
+            break;
         }
-        inputBox.dispose();
       });
 
-      inputBox.show();
+      // Handle panel closing
+      panel.onDidDispose(() => {
+        resolve(undefined);
+      });
     });
+  }
+
+  /**
+   * Generate the HTML for the multiline input webview
+   */
+  private getMultilineInputHtml(
+    webview: vscode.Webview,
+    placeHolder: string,
+    value: string
+  ): string {
+    // Create a nonce to whitelist scripts
+    const nonce = this.getNonce();
+
+    return `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+        <style>
+          body {
+            padding: 15px;
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-editor-foreground);
+            background-color: var(--vscode-editor-background);
+          }
+
+          .container {
+            display: flex;
+            flex-direction: column;
+            height: 50vh;
+          }
+
+          .textarea-container {
+            flex: 1;
+            margin-bottom: 12px;
+          }
+
+          textarea {
+            width: 100%;
+            height: calc(50vh - 72px);
+            padding: 10px;
+            resize: none;
+            font-family: var(--vscode-editor-font-family);
+            font-size: var(--vscode-editor-font-size);
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+          }
+
+          textarea:focus {
+            outline: 1px solid var(--vscode-focusBorder);
+            border-color: var(--vscode-focusBorder);
+          }
+
+          .button-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+          }
+
+          button {
+            padding: 6px 14px;
+            border: none;
+            cursor: pointer;
+          }
+
+          .save-button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+          }
+
+          .cancel-button {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="textarea-container">
+            <textarea id="input-area" placeholder="${placeHolder}">${value}</textarea>
+          </div>
+
+          <div class="button-container">
+            <button class="cancel-button" id="cancel-button">Cancel</button>
+            <button class="save-button" id="save-button">Save</button>
+          </div>
+        </div>
+
+        <script nonce="${nonce}">
+          const vscode = acquireVsCodeApi();
+          const textarea = document.getElementById('input-area');
+          const saveButton = document.getElementById('save-button');
+          const cancelButton = document.getElementById('cancel-button');
+
+          // Focus the textarea when the webview loads
+          textarea.focus();
+
+          // Add event listeners
+          saveButton.addEventListener('click', () => {
+            vscode.postMessage({
+              command: 'save',
+              text: textarea.value
+            });
+          });
+
+          cancelButton.addEventListener('click', () => {
+            vscode.postMessage({
+              command: 'cancel'
+            });
+          });
+
+          // Handle keyboard shortcuts
+          document.addEventListener('keydown', (e) => {
+            // Ctrl+Enter or Cmd+Enter to save
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+              vscode.postMessage({
+                command: 'save',
+                text: textarea.value
+              });
+            }
+
+            // Escape to cancel
+            if (e.key === 'Escape') {
+              vscode.postMessage({
+                command: 'cancel'
+              });
+            }
+          });
+        </script>
+      </body>
+      </html>`;
+  }
+
+  /**
+   * Generate a nonce for CSP
+   */
+  private getNonce(): string {
+    let text = "";
+    const possible =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
   }
 
   openExternal(uri: vscode.Uri): Promise<boolean> {
