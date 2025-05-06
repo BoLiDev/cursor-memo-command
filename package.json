@@ -113,6 +113,12 @@
         "title": "Clear Local Storage",
         "category": "Cursor Memo",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "cursor-memo.searchAllPrompts",
+        "title": "Search All Prompts",
+        "category": "CursorMemo",
+        "icon": "$(search)"
       }
     ],
     "views": {
@@ -196,7 +202,88 @@
           "group": "inline"
         }
       ],
-      "view/title": []
+      "view/title": [],
+      "commandPalette": [
+        {
+          "command": "cursor-memo.savePrompt",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.removePrompt",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.pasteToEditor",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.renamePrompt",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.editPrompt",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.addCategory",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.renameCategory",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.moveToCategory",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.deleteCategory",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.removeCloudCategory",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.addPromptToCategory",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.exportPrompts",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.importPrompts",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.syncFromGitLab",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.manageGitLabToken",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.pushToGitLab",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.clearLocalStorage",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.searchAllPrompts",
+          "when": "true"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "cursor-memo.searchAllPrompts",
+          "group": "navigation@1",
+          "when": "resourceLangId && resourceLangId != 'Log'"
+        }
+      ]
     },
     "configuration": {
       "title": "Cursor Memo",

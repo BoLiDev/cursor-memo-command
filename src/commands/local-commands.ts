@@ -104,9 +104,7 @@ export function createPasteToEditorHandler(
   return async (item: Prompt) => {
     if (!item) return;
 
-    await uiService.openCursorChat();
-    await uiService.writeClipboard(item.content);
-    await uiService.pasteClipboard();
+    await uiService.writeCursorChat(item.content);
   };
 }
 

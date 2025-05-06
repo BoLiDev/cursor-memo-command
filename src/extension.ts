@@ -40,6 +40,7 @@ import {
   createImportPromptsHandler,
 } from "./commands/local-transfer-commands";
 import { createPushToGitLabHandler } from "./commands/cloud-push-command";
+import { createSearchAllPromptsHandler } from "./commands/search-commands";
 
 let memoTreeProvider: MemoTreeDataProvider;
 let memoTreeView: vscode.TreeView<
@@ -184,12 +185,12 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     },
 
-    // Refresh command
-    "cursor-memo.refresh": async () => {
-      // console.log(
-      //   "Refresh triggered. View should update automatically via events."
-      // );
-    },
+    // Search All Prompts command
+    "cursor-memo.searchAllPrompts": createSearchAllPromptsHandler(
+      localMemoService,
+      cloudStoreService,
+      uiService
+    ),
   };
 
   // Register all commands

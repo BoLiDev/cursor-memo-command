@@ -376,7 +376,7 @@ export class VSCodeUserInteractionService {
         "editor.action.clipboardPasteAction"
       );
     } catch {
-      // ignore
+      this.showErrorMessage("Error pasting clipboard");
     }
   }
 
@@ -386,5 +386,11 @@ export class VSCodeUserInteractionService {
    */
   async openCursorChat(): Promise<void> {
     await vscode.commands.executeCommand("composer.startComposerPrompt");
+  }
+
+  async writeCursorChat(text: string): Promise<void> {
+    await this.openCursorChat();
+    await this.writeClipboard(text);
+    await this.pasteClipboard();
   }
 }
