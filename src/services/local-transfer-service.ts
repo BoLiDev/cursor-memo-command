@@ -14,15 +14,15 @@ import { Category } from "../models/category";
  * Service for handling data import and export operations for LOCAL data.
  */
 export class LocalTransferService {
-  constructor(private dataService: LocalService) {}
+  constructor(private localService: LocalService) {}
 
   /**
    * Export all data as JSON string using the human-friendly format
    * @returns JSON string of all commands organized by category and alias
    */
   public exportData(): string {
-    const commands = this.dataService.getCommands();
-    const categories = this.dataService.getCategories();
+    const commands = this.localService.getCommands();
+    const categories = this.localService.getCategories();
     const commandsData = this._transformMemoItemsToExportStructure(
       commands,
       categories
@@ -36,11 +36,11 @@ export class LocalTransferService {
    * @returns JSON string of selected categories and their commands
    */
   public exportSelectedCategories(selectedCategories: string[]): string {
-    const filteredCommands = this.dataService
+    const filteredCommands = this.localService
       .getCommands()
       .filter((cmd) => selectedCategories.includes(cmd.categoryId));
 
-    const categories = this.dataService.getCategories();
+    const categories = this.localService.getCategories();
     const commandsData = this._transformMemoItemsToExportStructure(
       filteredCommands,
       categories
@@ -63,19 +63,19 @@ export class LocalTransferService {
         this._parseAndTransformImportData(jsonData);
 
       // 处理分类
-      const currentCategories = this.dataService.getCategories();
+      const currentCategories = this.localService.getCategories();
       const currentCategoryIds = new Set(currentCategories.map((c) => c.id));
       const newCategoryNames = categoryNames.filter(
         (catName) => catName.trim() !== "" && !currentCategoryIds.has(catName)
       );
 
       if (newCategoryNames.length > 0) {
-        await this.dataService.addCategories(newCategoryNames);
+        await this.localService.addCategories(newCategoryNames);
       }
 
       // 处理命令
       if (commands.length > 0) {
-        await this.dataService.addCommands(commands);
+        await this.localService.addCommands(commands);
       }
 
       return {
@@ -125,19 +125,19 @@ export class LocalTransferService {
         this._transformParsedDataToMemoItems(filteredData);
 
       // 处理分类
-      const currentCategories = this.dataService.getCategories();
+      const currentCategories = this.localService.getCategories();
       const currentCategoryIds = new Set(currentCategories.map((c) => c.id));
       const newCategoryNames = categoryNamesFiltered.filter(
         (catName) => catName.trim() !== "" && !currentCategoryIds.has(catName)
       );
 
       if (newCategoryNames.length > 0) {
-        await this.dataService.addCategories(newCategoryNames);
+        await this.localService.addCategories(newCategoryNames);
       }
 
       // 处理命令
       if (commandsFiltered.length > 0) {
-        await this.dataService.addCommands(commandsFiltered);
+        await this.localService.addCommands(commandsFiltered);
       }
 
       return {

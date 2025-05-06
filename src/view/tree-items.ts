@@ -30,8 +30,8 @@ export class CategoryTreeItem extends vscode.TreeItem {
     public readonly isCloud: boolean
   ) {
     super(category.name, collapsibleState);
-    this.tooltip = `${category.name}`;
-    this.id = category.id;
+    this.tooltip = isCloud ? `${category.name} (Cloud)` : `${category.name}`;
+    this.id = this.isCloud ? `cloud:${category.id}` : `local:${category.id}`;
     this.contextValue = this.isCloud ? "cloudCategory" : "category";
     this.iconPath = vscode.ThemeIcon.Folder;
   }

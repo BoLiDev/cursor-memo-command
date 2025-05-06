@@ -14,7 +14,11 @@ export class MemoTreeViewModel {
   private localCommands: MemoItem[] = [];
   private cloudCommands: MemoItem[] = [];
   private localCategories: Category[] = [];
-  private cloudCategoriesSet: Set<string> = new Set();
+  private cloudCategoriesIds: string[] = [];
+
+  // Category ID prefixes to prevent collision between cloud and local categories
+  private static CLOUD_PREFIX = "cloud:";
+  private static LOCAL_PREFIX = "local:";
 
   private localCategoryNodes: Map<string, CategoryTreeItem> = new Map();
   private cloudCategoryNodes: Map<string, CategoryTreeItem> = new Map();
@@ -58,6 +62,9 @@ export class MemoTreeViewModel {
       }),
       this.cloudStoreService.onDidCloudCommandsChange(() => {
         this.update();
+      }),
+      this.cloudStoreService.onDidCloudCategoriesChange(() => {
+        this.update();
       })
     );
 
@@ -72,14 +79,7 @@ export class MemoTreeViewModel {
     this.localCommands = this.localDataService.getCommands();
     this.cloudCommands = this.cloudStoreService.getCloudCommands();
     this.localCategories = this.localDataService.getCategories();
-
-    // Update cloud categories set
-    this.cloudCategoriesSet.clear();
-    this.cloudCommands.forEach((cmd) => {
-      this.cloudCategoriesSet.add(
-        cmd.categoryId || this.localDataService.getDefaultCategoryId()
-      );
-    });
+    this.cloudCategoriesIds = this.cloudStoreService.getCloudCategories();
 
     // Rebuild category nodes
     this.rebuildCategoryNodes();
@@ -106,49 +106,78 @@ export class MemoTreeViewModel {
   }
 
   /**
+   * Add prefix to category ID to avoid collisions between cloud and local categories
+   * @param id Original category ID
+   * @param isCloud Whether the category is a cloud category
+   * @returns Prefixed category ID
+   */
+  private getPrefixedCategoryId(id: string, isCloud: boolean): string {
+    return isCloud
+      ? `${MemoTreeViewModel.CLOUD_PREFIX}${id}`
+      : `${MemoTreeViewModel.LOCAL_PREFIX}${id}`;
+  }
+
+  /**
+   * Remove prefix from category ID to get the original ID
+   * @param prefixedId Prefixed category ID
+   * @returns Original category ID
+   */
+  private getOriginalCategoryId(prefixedId: string): string {
+    if (prefixedId.startsWith(MemoTreeViewModel.CLOUD_PREFIX)) {
+      return prefixedId.substring(MemoTreeViewModel.CLOUD_PREFIX.length);
+    }
+    if (prefixedId.startsWith(MemoTreeViewModel.LOCAL_PREFIX)) {
+      return prefixedId.substring(MemoTreeViewModel.LOCAL_PREFIX.length);
+    }
+    return prefixedId;
+  }
+
+  /**
    * Rebuilds the internal maps of category tree items.
    */
   private rebuildCategoryNodes(): void {
     this.localCategoryNodes.clear();
     this.cloudCategoryNodes.clear();
 
+    // Build local category nodes
     this.localCategories.forEach((category) => {
       const items = this.getLocalCategoryItems(category.id);
       const collapsibleState =
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
           : vscode.TreeItemCollapsibleState.None;
+
+      // Use prefixed ID for map key
+      const prefixedId = this.getPrefixedCategoryId(category.id, false);
       this.localCategoryNodes.set(
-        category.id,
+        prefixedId,
         new CategoryTreeItem(category, collapsibleState, false)
       );
     });
 
-    this.cloudCategoriesSet.forEach((catId) => {
+    // Build cloud category nodes
+    this.cloudCategoriesIds.forEach((catId) => {
       const items = this.getCloudCategoryItems(catId);
 
-      // Avoid duplicating the "Default" category node if it exists locally and has no cloud items
-      if (
-        catId === this.localDataService.getDefaultCategoryId() &&
-        this.localCategoryNodes.has(catId) &&
-        !items.length
-      ) {
-        return;
-      }
       const collapsibleState =
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
           : vscode.TreeItemCollapsibleState.None;
-      // Use the name from local categories if available, otherwise use the ID as name
-      const categoryName =
-        this.localCategories.find((cat) => cat.id === catId)?.name ?? catId;
+
+      // Create category object from cloud category ID
+      const category: Category = {
+        id: catId,
+        name:
+          catId === this.cloudStoreService.getDefaultCategoryId()
+            ? "Default (Cloud)"
+            : catId,
+      };
+
+      // Use prefixed ID for map key
+      const prefixedId = this.getPrefixedCategoryId(catId, true);
       this.cloudCategoryNodes.set(
-        catId,
-        new CategoryTreeItem(
-          { id: catId, name: categoryName },
-          collapsibleState,
-          true
-        )
+        prefixedId,
+        new CategoryTreeItem(category, collapsibleState, true)
       );
     });
 
@@ -190,25 +219,11 @@ export class MemoTreeViewModel {
   }
 
   public getSortedCloudCategories(): CategoryTreeItem[] {
-    const cloudCats = Array.from(this.cloudCategoryNodes.values())
-      .filter((node) => {
-        const isDefault =
-          node.category.id === this.localDataService.getDefaultCategoryId();
-        const existsLocally = this.localCategoryNodes.has(node.category.id);
-        const hasCloudItems =
-          this.getCloudCategoryItems(node.category.id).length > 0;
-
-        if (isDefault && existsLocally) {
-          return hasCloudItems;
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        const nameA = a.category?.name || "";
-        const nameB = b.category?.name || "";
-        return nameA.localeCompare(nameB);
-      });
-    return cloudCats;
+    return Array.from(this.cloudCategoryNodes.values()).sort((a, b) => {
+      const nameA = a.category?.name || "";
+      const nameB = b.category?.name || "";
+      return nameA.localeCompare(nameB);
+    });
   }
 
   public getLocalCategoryItems(categoryId: string): MemoItem[] {
@@ -224,8 +239,12 @@ export class MemoTreeViewModel {
   }
 
   public getCategoryNodeForItem(item: MemoItem): CategoryTreeItem | undefined {
-    return item.isCloud
-      ? this.cloudCategoryNodes.get(item.categoryId)
-      : this.localCategoryNodes.get(item.categoryId);
+    if (item.isCloud) {
+      const prefixedId = this.getPrefixedCategoryId(item.categoryId, true);
+      return this.cloudCategoryNodes.get(prefixedId);
+    } else {
+      const prefixedId = this.getPrefixedCategoryId(item.categoryId, false);
+      return this.localCategoryNodes.get(prefixedId);
+    }
   }
 }

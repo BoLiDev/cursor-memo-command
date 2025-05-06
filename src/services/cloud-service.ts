@@ -24,13 +24,19 @@ export type CloudOperationResult<T> =
 export class CloudService {
   private static GITLAB_TOKEN_KEY = "cursor-memo-gitlab-token";
   private static CLOUD_COMMANDS_KEY = "cursor-memo-cloud-commands";
+  private static CLOUD_CATEGORIES_KEY = "cursor-memo-cloud-categories";
   private static DEFAULT_CATEGORY = "Default";
 
   private _onDidCloudCommandsChange = new vscode.EventEmitter<void>();
   readonly onDidCloudCommandsChange: vscode.Event<void> =
     this._onDidCloudCommandsChange.event;
 
+  private _onDidCloudCategoriesChange = new vscode.EventEmitter<void>();
+  readonly onDidCloudCategoriesChange: vscode.Event<void> =
+    this._onDidCloudCategoriesChange.event;
+
   private cloudCommands: MemoItem[] = [];
+  private cloudCategories: string[] = [];
   private initialized: boolean = false;
 
   constructor(
@@ -47,6 +53,7 @@ export class CloudService {
       return;
     }
     await this.loadCloudCommands();
+    await this.loadCloudCategories();
     this.initialized = true;
   }
 
@@ -55,6 +62,20 @@ export class CloudService {
    */
   public getCloudCommands(): MemoItem[] {
     return [...this.cloudCommands];
+  }
+
+  /**
+   * Get all currently stored cloud categories.
+   */
+  public getCloudCategories(): string[] {
+    return [...this.cloudCategories];
+  }
+
+  /**
+   * Get the default category ID for cloud items
+   */
+  public getDefaultCategoryId(): string {
+    return CloudService.DEFAULT_CATEGORY;
   }
 
   /**
@@ -155,8 +176,15 @@ export class CloudService {
       isCloud: true,
     }));
 
+    // Update cloud categories
+    this.cloudCategories = fetchResult.data.categories;
+
     await this.saveCloudCommands();
+    await this.saveCloudCategories();
+
     this._onDidCloudCommandsChange.fire();
+    this._onDidCloudCategoriesChange.fire();
+
     return {
       success: true,
       data: { syncedCommands: this.cloudCommands.length },
@@ -199,8 +227,17 @@ export class CloudService {
     // 合并现有命令和新命令
     this.cloudCommands = [...existingCommands, ...newCloudCommands];
 
+    // Update cloud categories with new selected categories
+    this.cloudCategories = [
+      ...new Set([...this.cloudCategories, ...selectedCategories]),
+    ];
+
     await this.saveCloudCommands();
+    await this.saveCloudCategories();
+
     this._onDidCloudCommandsChange.fire();
+    this._onDidCloudCategoriesChange.fire();
+
     return {
       success: true,
       data: { syncedCommands: newCloudCommands.length },
@@ -233,11 +270,21 @@ export class CloudService {
     );
     const removedCount = originalLength - this.cloudCommands.length;
 
+    // Remove from cloud categories list
+    this.cloudCategories = this.cloudCategories.filter(
+      (cat) => cat !== categoryName
+    );
+
     if (removedCount > 0) {
       await this.saveCloudCommands();
+      await this.saveCloudCategories();
       this._onDidCloudCommandsChange.fire();
+      this._onDidCloudCategoriesChange.fire();
       return { success: true, removedCommands: removedCount };
     } else {
+      // Even if no commands were removed, the category might have been removed
+      await this.saveCloudCategories();
+      this._onDidCloudCategoriesChange.fire();
       return { success: true, removedCommands: 0 };
     }
   }
@@ -361,6 +408,41 @@ export class CloudService {
       []
     );
     this.cloudCommands = stored.map((cmd) => ({ ...cmd, isCloud: true }));
+  }
+
+  /**
+   * Save cloud categories to storage
+   */
+  private async saveCloudCategories(): Promise<void> {
+    await this.storageService.setValue(
+      CloudService.CLOUD_CATEGORIES_KEY,
+      this.cloudCategories
+    );
+  }
+
+  /**
+   * Load cloud categories from storage
+   */
+  private async loadCloudCategories(): Promise<void> {
+    this.cloudCategories = this.storageService.getValue<string[]>(
+      CloudService.CLOUD_CATEGORIES_KEY,
+      []
+    );
+
+    // Ensure we also add any categories from the commands
+    const categoriesFromCommands = new Set<string>();
+    this.cloudCommands.forEach((cmd) => {
+      if (cmd.categoryId) {
+        categoriesFromCommands.add(cmd.categoryId);
+      }
+    });
+
+    if (categoriesFromCommands.size > 0) {
+      this.cloudCategories = [
+        ...new Set([...this.cloudCategories, ...categoriesFromCommands]),
+      ];
+      await this.saveCloudCategories();
+    }
   }
 
   /**
