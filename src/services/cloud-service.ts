@@ -7,7 +7,12 @@ import { VscodeStorageService } from "./vscode-storage-service";
 import { ConfigurationService } from "./vscode-configuration-service";
 import { GitlabApiService, GitlabApiError } from "./cloud-api-service";
 import { z } from "zod";
-import { removeDuplicatePrompts } from "../utils";
+import {
+  removeDuplicatePrompts,
+  isDuplicatePrompt,
+  filterOutDuplicates,
+  isSamePrompt,
+} from "../utils";
 
 export type CloudOperationResult<T> =
   | { success: true; data: T }
@@ -191,38 +196,50 @@ export class CloudService {
    */
   public async syncSelectedFromGitLab(
     selectedCategories: string[]
-  ): Promise<CloudOperationResult<{ syncedPrompts: number }>> {
+  ): Promise<
+    CloudOperationResult<{ syncedPrompts: number; deletedPrompts: number }>
+  > {
     const fetchResult = await this.fetchAndParseTeamPrompts();
 
     if (!fetchResult.success) {
       return fetchResult;
     }
 
-    const allImportedPrompts: Prompt[] = fetchResult.data.prompts || [];
-    const filteredPrompts = allImportedPrompts.filter((cmd) =>
+    // Get all prompts from GitLab
+    const allGitlabPrompts: Prompt[] = fetchResult.data.prompts || [];
+
+    // Convert GitLab prompts to cloud prompts
+    const allGitlabCloudPrompts = allGitlabPrompts.map((cmd) => ({
+      ...cmd,
+      isCloud: true,
+    }));
+
+    // Keep only those local cloud commands that still exist in GitLab, regardless of category
+    const existingPromptsToKeep = this.cloudPrompts.filter((localCmd) =>
+      allGitlabPrompts.some((gitlabCmd) => isSamePrompt(localCmd, gitlabCmd))
+    );
+
+    // Calculate the number of deleted commands
+    const deletedCount =
+      this.cloudPrompts.length - existingPromptsToKeep.length;
+
+    // Filter GitLab commands to only include user-selected categories
+    const filteredGitlabPrompts = allGitlabCloudPrompts.filter((cmd) =>
       selectedCategories.includes(
         cmd.categoryId || CloudService.DEFAULT_CATEGORY
       )
     );
 
-    // Get all new prompts and mark them as cloud prompts
-    const newCloudPrompts = filteredPrompts.map((cmd) => ({
-      ...cmd,
-      isCloud: true,
-    }));
-
-    // Remove prompts that conflict with selected categories from existing cloud prompts
-    const existingPrompts = this.cloudPrompts.filter(
-      (cmd) =>
-        !selectedCategories.includes(
-          cmd.categoryId || CloudService.DEFAULT_CATEGORY
-        )
+    // Filter out prompts that already exist in our keeper list
+    const uniqueNewPrompts = filterOutDuplicates(
+      filteredGitlabPrompts,
+      existingPromptsToKeep
     );
 
-    // Merge existing prompts with new prompts
-    this.cloudPrompts = [...existingPrompts, ...newCloudPrompts];
+    // Merge all commands: existing local commands + new commands from selected categories
+    this.cloudPrompts = [...existingPromptsToKeep, ...uniqueNewPrompts];
 
-    // Update cloud categories with new selected categories
+    // Update cloud categories
     this.cloudCategories = [
       ...new Set([...this.cloudCategories, ...selectedCategories]),
     ];
@@ -235,7 +252,10 @@ export class CloudService {
 
     return {
       success: true,
-      data: { syncedPrompts: newCloudPrompts.length },
+      data: {
+        syncedPrompts: uniqueNewPrompts.length,
+        deletedPrompts: deletedCount,
+      },
     };
   }
 

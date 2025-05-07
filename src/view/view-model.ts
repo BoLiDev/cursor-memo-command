@@ -128,18 +128,15 @@ export class MemoTreeViewModel {
     this.localCategories.forEach((category) => {
       const items = this.getLocalCategoryItems(category.id);
 
-      // Hide the default category if it is empty
-      if (
-        category.id === this.localDataService.getDefaultCategoryId() &&
-        items.length === 0
-      ) {
+      // Only show categories that have items
+      if (items.length === 0) {
         return;
       }
 
       const collapsibleState =
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
-          : vscode.TreeItemCollapsibleState.None;
+          : vscode.TreeItemCollapsibleState.None; // This will always be Collapsed due to the check above, but keeping the logic consistent
 
       // Use prefixed ID for map key
       const prefixedId = this.getPrefixedCategoryId(category.id, false);
@@ -153,10 +150,15 @@ export class MemoTreeViewModel {
     this.cloudCategoriesIds.forEach((catId) => {
       const items = this.getCloudCategoryItems(catId);
 
+      // Only show categories that have items
+      if (items.length === 0) {
+        return;
+      }
+
       const collapsibleState =
         items.length > 0
           ? vscode.TreeItemCollapsibleState.Collapsed
-          : vscode.TreeItemCollapsibleState.None;
+          : vscode.TreeItemCollapsibleState.None; // This will always be Collapsed due to the check above, but keeping the logic consistent
 
       // Create category object from cloud category ID
       const category: Category = {
@@ -176,7 +178,10 @@ export class MemoTreeViewModel {
     });
 
     // Update Group Node States
-    const localCollapsibleState = this.hasLocalData()
+    // The group nodes should appear if there are any categories or prompts directly under them.
+    const localGroupHasContent =
+      this.localPrompts.length > 0 || this.localCategoryNodes.size > 0;
+    const localCollapsibleState = localGroupHasContent
       ? vscode.TreeItemCollapsibleState.Expanded
       : vscode.TreeItemCollapsibleState.None;
     this.localGroupNode = new CategoryGroupTreeItem(
@@ -185,10 +190,11 @@ export class MemoTreeViewModel {
       false
     );
 
-    const cloudCollapsibleState =
-      this.cloudPrompts.length > 0 || this.cloudCategoryNodes.size > 0
-        ? vscode.TreeItemCollapsibleState.Expanded
-        : vscode.TreeItemCollapsibleState.Collapsed;
+    const cloudGroupHasContent =
+      this.cloudPrompts.length > 0 || this.cloudCategoryNodes.size > 0;
+    const cloudCollapsibleState = cloudGroupHasContent
+      ? vscode.TreeItemCollapsibleState.Expanded
+      : vscode.TreeItemCollapsibleState.Collapsed; // Cloud group is collapsed by default if empty
     this.cloudGroupNode = new CategoryGroupTreeItem(
       this.cloudGroupNode.label!,
       cloudCollapsibleState,
