@@ -81,7 +81,7 @@ export async function activate(context: vscode.ExtensionContext) {
     cloudStoreService
   );
   // Register Tree View and push TreeDataProvider to subscriptions for disposal
-  memoTreeView = vscode.window.createTreeView("promptMarkPanel", {
+  memoTreeView = vscode.window.createTreeView("promptHubPanel", {
     treeDataProvider: memoTreeProvider,
     showCollapseAll: true,
   });
