@@ -22,6 +22,21 @@ export function isSamePrompt(prompt1: Prompt, prompt2: Prompt): boolean {
 }
 
 /**
+ * Check if two prompts are the same
+ * If two prompts have the same categoryId, alias/label, they are considered duplicates in cloud
+ * @param prompt1 The first prompt
+ * @param prompt2 The second prompt
+ * @returns Whether they are duplicates
+ */
+export function isSameCloudPrompt(prompt1: Prompt, prompt2: Prompt): boolean {
+  // Use alias if it exists, otherwise use label
+  const name1 = prompt1.alias || prompt1.label;
+  const name2 = prompt2.alias || prompt2.label;
+
+  return prompt1.categoryId === prompt2.categoryId && name1 === name2;
+}
+
+/**
  * Check if a command exists in an existing command collection
  * @param newCmd The command to check
  * @param existingCmds The existing command collection

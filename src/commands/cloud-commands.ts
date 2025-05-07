@@ -84,17 +84,15 @@ export function createSyncFromGitLabHandler(
       }
 
       // Step 2: Let user select categories
-      const selectedOption = await uiService.showQuickPick(
-        cloudCategories.map((cat) => ({ label: cat })),
-        {
-          placeHolder: "Select categories to sync from cloud",
-          canPickMany: true,
-        }
-      );
-
-      if (!selectedOption || selectedOption.length === 0) {
-        return;
-      }
+      const selectedOption =
+        (await uiService.showQuickPick(
+          cloudCategories.map((cat) => ({ label: cat })),
+          {
+            placeHolder:
+              "Sync all of your cloud prompts. If you want to download more, then select the categories to download from cloud.",
+            canPickMany: true,
+          }
+        )) || [];
 
       const selectedCategoryLabels = selectedOption.map((item) => item.label);
 
@@ -121,7 +119,7 @@ export function createSyncFromGitLabHandler(
       if (syncResult.success) {
         // Use void operator to ensure message doesn't block function execution
         void uiService.showInformationMessage(
-          `Synced ${syncResult.data.syncedPrompts} prompt(s) from selected GitLab categories.`
+          `Synced ${syncResult.data.syncedPrompts} prompt(s) from selected GitLab categories. ${syncResult.data.deletedPrompts} prompt(s) removed.`
         );
       } else {
         if (syncResult.needsAuth) {

@@ -9,9 +9,9 @@ import { GitlabApiService, GitlabApiError } from "./cloud-api-service";
 import { z } from "zod";
 import {
   removeDuplicatePrompts,
-  isDuplicatePrompt,
   filterOutDuplicates,
   isSamePrompt,
+  isSameCloudPrompt,
 } from "../utils";
 
 export type CloudOperationResult<T> =
@@ -215,9 +215,18 @@ export class CloudService {
     }));
 
     // Keep only those local cloud commands that still exist in GitLab, regardless of category
-    const existingPromptsToKeep = this.cloudPrompts.filter((localCmd) =>
-      allGitlabPrompts.some((gitlabCmd) => isSamePrompt(localCmd, gitlabCmd))
+    const existingPromptsToKeep = allGitlabCloudPrompts.filter((localCmd) =>
+      this.cloudPrompts.some((gitlabCmd) =>
+        isSameCloudPrompt(localCmd, gitlabCmd)
+      )
     );
+
+    const existingPromptsExactSame = allGitlabCloudPrompts.filter((localCmd) =>
+      this.cloudPrompts.some((gitlabCmd) => isSamePrompt(localCmd, gitlabCmd))
+    );
+
+    const updatedPrompts =
+      existingPromptsToKeep.length - existingPromptsExactSame.length;
 
     // Calculate the number of deleted commands
     const deletedCount =
@@ -253,7 +262,7 @@ export class CloudService {
     return {
       success: true,
       data: {
-        syncedPrompts: uniqueNewPrompts.length,
+        syncedPrompts: uniqueNewPrompts.length + updatedPrompts,
         deletedPrompts: deletedCount,
       },
     };
