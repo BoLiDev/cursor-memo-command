@@ -391,6 +391,21 @@ export class CloudService {
     await this.storageService.deleteSecret(CloudService.GITLAB_TOKEN_KEY);
   }
 
+  /**
+   * Clears all locally stored cloud memos and categories.
+   * @returns Promise that resolves when all data is cleared.
+   */
+  public async clearAllCloudData(): Promise<void> {
+    this.cloudPrompts = [];
+    this.cloudCategories = [];
+
+    await this.saveCloudPrompts();
+    await this.saveCloudCategories();
+
+    this._onDidCloudPromptsChange.fire();
+    this._onDidCloudCategoriesChange.fire();
+  }
+
   private async saveCloudPrompts(): Promise<void> {
     await this.storageService.setValue(
       CloudService.CLOUD_PROMPTS_KEY,

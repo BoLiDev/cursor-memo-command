@@ -115,6 +115,12 @@
         "icon": "$(clear-all)"
       },
       {
+        "command": "cursor-memo.clearCloudStorage",
+        "title": "Clear Cloud Storage",
+        "category": "Cursor Memo",
+        "icon": "$(clear-all)"
+      },
+      {
         "command": "cursor-memo.searchAllPrompts",
         "title": "Search All Prompts",
         "category": "CursorMemo",
@@ -277,6 +283,10 @@
         },
         {
           "command": "cursor-memo.clearLocalStorage",
+          "when": "true"
+        },
+        {
+          "command": "cursor-memo.clearCloudStorage",
           "when": "true"
         },
         {

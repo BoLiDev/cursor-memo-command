@@ -21,6 +21,7 @@ import {
   createSyncFromGitLabHandler,
   createManageGitLabTokenHandler,
 } from "./commands/cloud-commands";
+
 import {
   createSavePromptHandler,
   createRemovePromptHandler,
@@ -40,8 +41,9 @@ import {
   createImportPromptsHandler,
 } from "./commands/local-transfer-commands";
 import { createPushToGitLabHandler } from "./commands/cloud-push-command";
-import { clearLocalStorageCommand } from "./commands/local-storage-command";
 import { createSearchAllPromptsHandler } from "./commands/search-commands";
+import { clearLocalStorageCommand } from "./commands/local-storage-command";
+import { createClearCloudStorageHandler } from "./commands/cloud-storage-command";
 
 let memoTreeProvider: MemoTreeDataProvider;
 let memoTreeView: vscode.TreeView<
@@ -155,6 +157,10 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
     "cursor-memo.clearLocalStorage": clearLocalStorageCommand(
       localMemoService,
+      uiService
+    ),
+    "cursor-memo.clearCloudStorage": createClearCloudStorageHandler(
+      cloudStoreService,
       uiService
     ),
     "cursor-memo.searchAllPrompts": createSearchAllPromptsHandler(
