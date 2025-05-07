@@ -1,5 +1,3 @@
-# Cursor Memo Command
-
 一个用于**复用和同步 Cursor Prompt** 的插件，当前仍处于 beta 阶段，任何问题欢迎联系 [@Li Bo 李博]。
 
 - 插件仓库地址：[https://github.com/BoLiDev/cursor-memo-command](https://github.com/BoLiDev/cursor-memo-command)
