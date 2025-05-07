@@ -128,8 +128,11 @@ export class MemoTreeViewModel {
     this.localCategories.forEach((category) => {
       const items = this.getLocalCategoryItems(category.id);
 
-      // Only show categories that have items
-      if (items.length === 0) {
+      // Only show local default category if it has items
+      if (
+        items.length === 0 &&
+        category.id === this.localDataService.getDefaultCategoryId()
+      ) {
         return;
       }
 
@@ -150,8 +153,11 @@ export class MemoTreeViewModel {
     this.cloudCategoriesIds.forEach((catId) => {
       const items = this.getCloudCategoryItems(catId);
 
-      // Only show categories that have items
-      if (items.length === 0) {
+      // Only show cloud default category if it has items
+      if (
+        items.length === 0 &&
+        catId === this.cloudStoreService.getDefaultCategoryId()
+      ) {
         return;
       }
 

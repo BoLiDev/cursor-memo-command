@@ -116,7 +116,7 @@ export class CloudService {
    * Fetches, decodes, parses, and validates team prompts from GitLab.
    * Does not update internal state.
    */
-  private async fetchAndParseTeamPrompts(): Promise<
+  public async fetchAndParseTeamPrompts(): Promise<
     CloudOperationResult<{ prompts: Prompt[]; categories: string[] }>
   > {
     try {
@@ -513,5 +513,23 @@ export class CloudService {
     });
 
     return result;
+  }
+
+  /**
+   * Add a single cloud prompt to the local cloud prompt list and persist it.
+   */
+  public async addCloudPrompt(prompt: Prompt): Promise<void> {
+    if (!this.cloudPrompts.some((p) => isSamePrompt(p, prompt))) {
+      this.cloudPrompts.push({ ...prompt, isCloud: true });
+
+      if (!this.cloudCategories.includes(prompt.categoryId)) {
+        this.cloudCategories.push(prompt.categoryId);
+      }
+
+      await this.saveCloudPrompts();
+      await this.saveCloudCategories();
+      this._onDidCloudPromptsChange.fire();
+      this._onDidCloudCategoriesChange.fire();
+    }
   }
 }
