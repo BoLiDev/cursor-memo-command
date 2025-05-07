@@ -9,7 +9,7 @@ import {
   GitLabFileCommitResponseSchema,
 } from "../zod";
 import { VscodeStorageService } from "./vscode-storage-service";
-import { ConfigurationService } from "./configuration-service";
+import { ConfigurationService } from "./vscode-configuration-service";
 
 // Define a specific error type for API issues
 export class GitlabApiError extends Error {

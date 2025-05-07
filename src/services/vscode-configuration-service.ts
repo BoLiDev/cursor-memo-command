@@ -16,6 +16,7 @@ export class ConfigurationService {
   private gitlabProjectId!: string;
   private gitlabFilePath!: string;
   private gitlabBranch!: string;
+  private gitlabName!: string;
 
   constructor(context: vscode.ExtensionContext) {
     this.loadConfiguration();
@@ -42,6 +43,7 @@ export class ConfigurationService {
     this.gitlabProjectId = config.get<string>("gitlabProjectId") || "9993";
     this.gitlabFilePath = config.get<string>("gitlabFilePath") || "prompt.json";
     this.gitlabBranch = config.get<string>("gitlabBranch") || "master";
+    this.gitlabName = config.get<string>("gitlabName") || "Anonymous";
   }
 
   public getGitlabDomain(): string {
@@ -58,6 +60,10 @@ export class ConfigurationService {
 
   public getGitlabBranch(): string {
     return this.gitlabBranch;
+  }
+
+  public getGitlabName(): string {
+    return this.gitlabName;
   }
 }
 

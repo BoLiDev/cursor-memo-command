@@ -6,7 +6,7 @@ import { LocalService } from "./services/local-service";
 import { GitlabApiService } from "./services/cloud-api-service";
 import { CloudService } from "./services/cloud-service";
 import { VscodeStorageService } from "./services/vscode-storage-service";
-import { ConfigurationService } from "./services/configuration-service";
+import { ConfigurationService } from "./services/vscode-configuration-service";
 import { VSCodeUserInteractionService } from "./services/vscode-user-interaction-service"; // Use class
 
 import {

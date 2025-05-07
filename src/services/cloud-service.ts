@@ -1,11 +1,10 @@
 /** @format */
 
 import * as vscode from "vscode";
-import * as os from "os";
 import { Prompt } from "../models/prompt";
 import { parsePrompts, serializePrompts, PromptsStructureSchema } from "../zod";
 import { VscodeStorageService } from "./vscode-storage-service";
-import { ConfigurationService } from "./configuration-service";
+import { ConfigurationService } from "./vscode-configuration-service";
 import { GitlabApiService, GitlabApiError } from "./cloud-api-service";
 import { z } from "zod";
 import { removeDuplicatePrompts } from "../utils";
@@ -349,7 +348,7 @@ export class CloudService {
 
       // 5. Create Merge Request
       const targetBranch = this.configService.getGitlabBranch();
-      const mrTitle = `Update prompts from ${os.hostname() || "local"}`;
+      const mrTitle = `Update prompts from ${this.configService.getGitlabName()}`;
       const mrDescription = `This merge request adds ${newPromptsCount} new prompt(s) and updates ${updatedCount} existing prompt(s) from categories: ${involvedCategories.join(", ")}.`;
       const mrResult = await this.gitlabApiService.createMergeRequest(
         branchName,

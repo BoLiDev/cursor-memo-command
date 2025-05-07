@@ -2,7 +2,7 @@
   "name": "cursor-memo-plugin",
   "displayName": "PromptHub",
   "description": "Plugin to save and reuse Cursor chat commands",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "Boruto",
   "icon": "images/logo.png",
   "repository": {
@@ -325,6 +325,11 @@
           "type": "string",
           "default": "master",
           "description": "GitLab branch name containing the team commands file"
+        },
+        "cursorMemo.gitlabName": {
+          "type": "string",
+          "default": "Anonymous",
+          "description": "GitLab username"
         }
       }
     }
