@@ -1,9 +1,10 @@
 {
   "name": "cursor-memo-plugin",
-  "displayName": "Cursor Memo Plugin",
+  "displayName": "PromptMark",
   "description": "Plugin to save and reuse Cursor chat commands",
   "version": "0.3.3",
   "publisher": "Boruto",
+  "icon": "images/logo.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/BoLiDev/cursor-memo-command.git"
@@ -130,8 +131,8 @@
     "views": {
       "explorer": [
         {
-          "id": "cursorMemoPanel",
-          "name": "Command Memo"
+          "id": "promptMarkPanel",
+          "name": "PromptMark"
         }
       ]
     },
@@ -139,79 +140,79 @@
       "view/item/context": [
         {
           "command": "cursor-memo.addCategory",
-          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "when": "view == promptMarkPanel && viewItem == localGroup",
           "group": "inline@2"
         },
         {
           "command": "cursor-memo.importPrompts",
-          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "when": "view == promptMarkPanel && viewItem == localGroup",
           "group": "inline@3"
         },
         {
           "command": "cursor-memo.exportPrompts",
-          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "when": "view == promptMarkPanel && viewItem == localGroup",
           "group": "inline@4"
         },
         {
           "command": "cursor-memo.pushToGitLab",
-          "when": "view == cursorMemoPanel && viewItem == localGroup",
+          "when": "view == promptMarkPanel && viewItem == localGroup",
           "group": "inline@5"
         },
         {
           "command": "cursor-memo.syncFromGitLab",
-          "when": "view == cursorMemoPanel && viewItem == cloudGroup",
+          "when": "view == promptMarkPanel && viewItem == cloudGroup",
           "group": "inline@1"
         },
         {
           "command": "cursor-memo.manageGitLabToken",
-          "when": "view == cursorMemoPanel && viewItem == cloudGroup",
+          "when": "view == promptMarkPanel && viewItem == cloudGroup",
           "group": "inline@2"
         },
         {
           "command": "cursor-memo.renamePrompt",
-          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "when": "view == promptMarkPanel && viewItem == memoItem",
           "group": "1_modification@1"
         },
         {
           "command": "cursor-memo.editPrompt",
-          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "when": "view == promptMarkPanel && viewItem == memoItem",
           "group": "1_modification@2"
         },
         {
           "command": "cursor-memo.removePrompt",
-          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "when": "view == promptMarkPanel && viewItem == memoItem",
           "group": "1_modification@3"
         },
         {
           "command": "cursor-memo.moveToCategory",
-          "when": "view == cursorMemoPanel && viewItem == memoItem",
+          "when": "view == promptMarkPanel && viewItem == memoItem",
           "group": "2_organize"
         },
         {
           "command": "cursor-memo.renameCategory",
-          "when": "view == cursorMemoPanel && viewItem == category",
+          "when": "view == promptMarkPanel && viewItem == category",
           "group": "1_modification@1"
         },
         {
           "command": "cursor-memo.deleteCategory",
-          "when": "view == cursorMemoPanel && viewItem == category",
+          "when": "view == promptMarkPanel && viewItem == category",
           "group": "1_modification@2"
         },
         {
           "command": "cursor-memo.removeCloudCategory",
-          "when": "view == cursorMemoPanel && viewItem == cloudCategory",
+          "when": "view == promptMarkPanel && viewItem == cloudCategory",
           "group": "1_modification@1"
         },
         {
           "command": "cursor-memo.addPromptToCategory",
-          "when": "view == cursorMemoPanel && viewItem == category",
+          "when": "view == promptMarkPanel && viewItem == category",
           "group": "inline"
         }
       ],
       "view/title": [
         {
           "command": "cursor-memo.searchAllPrompts",
-          "when": "view == cursorMemoPanel",
+          "when": "view == promptMarkPanel",
           "group": "navigation@2",
           "icon": "$(search)"
         }

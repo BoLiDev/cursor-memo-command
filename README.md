@@ -1,139 +1,119 @@
-<!-- @format -->
+# Cursor Memo Command
 
-# GitLab文件访问模块
+一个用于**复用和同步 Cursor Prompt** 的插件，当前仍处于 beta 阶段，任何问题欢迎联系 [@Li Bo 李博]。
 
-一个简单、高效的GitLab API客户端，用于获取项目中的文件和目录内容。
+- 插件仓库地址：[https://github.com/BoLiDev/cursor-memo-command](https://github.com/BoLiDev/cursor-memo-command)
+- 所有公司相关信息均通过环境变量本地存储，当前开发在域外环境中进行，后续将迁移至内网
 
-## 特性
+---
 
-- 获取GitLab项目中的文件内容
-- 获取GitLab项目中的目录内容
-- 自动获取项目的默认分支
-- 类型安全（使用Zod进行运行时类型验证）
+## 📦 安装方式
 
-## 安装
+### 1. 下载插件
 
-```bash
-npm install node-fetch zod @types/node-fetch
-```
+目前还没上架插件商店，需要手动安装
 
-## 使用示例
+> 安装方式请参考 [Lark Docs](https://okg-block.sg.larksuite.com/wiki/MG5Owj9bSi5Plpkk9hDlwHLTgeh)
 
-### 获取文件内容
+### 2. 域外安装
 
-```typescript
-import { getFileContent } from "./gitlab";
+将打包得到的 `.vsix` 文件拖入 Cursor Extension 面板即可。
 
-// 设置环境变量
-process.env.GITLAB_PERSONAL_ACCESS_TOKEN = "your_token_here";
-process.env.GITLAB_API_URL = "https://gitlab.com/api/v4"; // 可选，默认使用gitlab.com
+### 3. 域内使用
 
-// 获取文件内容
-const projectId = "namespace/project";
-const filePath = "path/to/file.js";
-const branch = "main"; // 可选，如果不提供则使用项目默认分支
+由于云同步基于内网 GitLab API，仅支持在**内网环境使用**；域外仍可正常使用本地功能。
 
-try {
-  const content = await getFileContent(projectId, filePath, branch);
+> ❗ 若遇到无法保存或导出的问题，可能是通过错误方式打开了 DACS 应用：请不要通过 Spotlight 或 Dock 打开，而是通过 **DACS 应用程序列表** 正确启动。
 
-  // 如果返回的是文件
-  if (!Array.isArray(content)) {
-    console.log(`文件名: ${content.file_name}`);
-    console.log(`大小: ${content.size} 字节`);
+---
 
-    // 解码Base64内容
-    const decodedContent = Buffer.from(content.content, "base64").toString(
-      "utf-8"
-    );
-    console.log(`内容: ${decodedContent}`);
-  }
-} catch (error) {
-  console.error("获取文件失败:", error);
-}
-```
+## 🧩 使用指南
 
-### 获取目录内容
+### 🗂 复用指令
 
-```typescript
-import { getFileContent } from "./gitlab";
+1. **首次使用**：需创建一个文件夹用于添加指令
+2. **添加指令**：悬停文件夹显示 ➕ 按钮，点击弹出输入框
+   - 默认粘贴剪贴板内容，可手动编辑
+   - 点击“保存”后可在视图中查看
+3. **使用指令**：
+   - 单击 → 自动复制到 Chat 输入框
+   - 右键可执行额外操作：
+     - 重命名
+     - 删除
+     - 移动至其他文件夹
 
-// 设置环境变量
-process.env.GITLAB_PERSONAL_ACCESS_TOKEN = "your_token_here";
+---
 
-// 获取目录内容
-const projectId = "namespace/project";
-const directoryPath = "path/to/directory";
+### 💾 本地导入与导出
 
-try {
-  const content = await getFileContent(projectId, directoryPath);
+#### 📤 导出
 
-  // 如果返回的是目录
-  if (Array.isArray(content)) {
-    console.log("目录内容:");
-    content.forEach((item) => {
-      console.log(`- ${item.name} (${item.type}): ${item.path}`);
-    });
-  }
-} catch (error) {
-  console.error("获取目录失败:", error);
-}
-```
+1. 悬停 Local 分组标题栏，点击导出图标
+2. 多选要导出的 Prompt
+3. 插件将导出为 `.json` 格式的文件，可用于备份或分享
 
-## API
+#### 📥 导入
 
-### getFileContent(projectId, filePath, ref?)
+1. 同样在 Local 分组标题栏点击导入图标
+2. 选择目标文件夹
+3. 自动导入并**去重**处理
 
-获取GitLab项目中的文件或目录内容。
+---
 
-**参数:**
+### ☁️ 云同步（内网专用）
 
-- `projectId` (string): 项目ID或URL编码的路径（例如 'namespace/project'）
-- `filePath` (string): 要获取内容的文件或目录路径
-- `ref` (string, 可选): 分支、标签或提交的引用，默认为项目的默认分支
+#### 配置 GitLab 密钥
 
-**返回值:**
+1. 悬停 Cloud 分组标题栏，点击侧边的 `🔑` 图标
+2. 输入并保存 GitLab Token
+   - 密钥存储在 VSCode Context Secret Storage 中，确保安全
 
-返回一个Promise，解析为文件内容或目录内容列表。
+#### 上传至云端
 
-## 环境变量
+1. 在 Local 分组标题栏点击云上传图标
+2. 选择 Prompt，确认后将自动创建 GitLab Merge Request
+3. 请联系 @Li Shaoyi 李绍懿 审核合并
 
-- `GITLAB_PERSONAL_ACCESS_TOKEN`: 必需。GitLab个人访问令牌，用于API认证。
-- `GITLAB_API_URL`: 可选。GitLab API URL，默认为 'https://gitlab.com/api/v4'。
+#### 从云端下载
 
-## 类型
+1. 点击 Cloud 分组的同步按钮
+2. 弹出下拉框选择要导入的云端 Prompt
+3. 导入成功后会归入 Cloud 分组
 
-模块包含以下主要类型定义：
+> 💡 云端 Prompt 属于团队资源，无法私自修改，通过 GitLab 权限控制
+> 临时云端仓库地址：[`okfe-prompt`](https://gitlab.okg.com/okfe/demos/okfe-prompt)
 
-```typescript
-// 文件内容
-type GitLabFileContent = {
-  file_name: string;
-  file_path: string;
-  size: number;
-  encoding: string;
-  content: string; // Base64编码
-  content_sha256: string;
-  ref: string;
-  blob_id: string;
-  commit_id: string;
-  last_commit_id: string;
-  execute_filemode?: boolean;
-};
+---
 
-// 目录项
-type GitLabDirectoryContent = {
-  name: string;
-  path: string;
-  type: string;
-  mode: string;
-  id: string;
-  web_url: string;
-};
+### 🔍 搜索功能
 
-// 统一内容类型
-type GitLabContent = GitLabFileContent | GitLabDirectoryContent[];
-```
+- 点击插件标题栏 `🔍` 图标，弹出支持筛选的搜索框
+- 支持搜索本地与已导入的云端 Prompt
+- 点击结果即可一键添加到 Chat
 
-## License
+---
 
-MIT
+## 🚀 应用场景示例
+
+- **减少重复劳动**：如 Git 常用指令可保存，一键调用
+- **固化流程**：将流程按顺序保存到文件夹，逐步点击执行
+- **提升团队一致性**：PIC 可共享 Prompt，团队成员快速导入实现统一
+
+---
+
+## ❓ 常见问题
+
+### 为什么不直接用 Project Rule？
+
+Prompt 和 Rul **Rule 更偏向约束**（例如 Code Style、提交规范）
+
+- **Prompt 更偏向需求表达**（如任务描述模板、常见命令）
+
+只有高度通用的规范适合放入 Rule，而多数个性化场景建议使用 Prompt 形式复用。
+
+---
+
+## 🧪 状态
+
+> 当前插件处于 Beta 阶段，欢迎反馈问题与建议
+> 联系方式：[@Li Bo 李博]
