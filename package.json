@@ -139,6 +139,12 @@
     "menus": {
       "view/item/context": [
         {
+          "command": "cursor-memo.clearLocalStorage",
+          "when": "view == promptHubPanel && viewItem == localGroup",
+          "group": "inline@1",
+          "icon": "$(clear-all)"
+        },
+        {
           "command": "cursor-memo.addCategory",
           "when": "view == promptHubPanel && viewItem == localGroup",
           "group": "inline@2"
@@ -167,6 +173,12 @@
           "command": "cursor-memo.manageGitLabToken",
           "when": "view == promptHubPanel && viewItem == cloudGroup",
           "group": "inline@2"
+        },
+        {
+          "command": "cursor-memo.clearCloudStorage",
+          "when": "view == promptHubPanel && viewItem == cloudGroup",
+          "group": "inline@3",
+          "icon": "$(clear-all)"
         },
         {
           "command": "cursor-memo.renamePrompt",
